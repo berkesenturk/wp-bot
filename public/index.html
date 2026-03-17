@@ -21,7 +21,6 @@
   --red: #ff1744;
   --text: #e2e2e2;
   --muted: #555;
-  --muted2: #333;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -33,8 +32,6 @@ body {
   grid-template-rows: 52px 1fr;
   overflow: hidden;
 }
-
-/* HEADER */
 header {
   display: flex;
   align-items: center;
@@ -68,15 +65,11 @@ header {
 #status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); transition: 0.3s; }
 #status-badge.connected { border-color: var(--green); color: var(--green); }
 #status-badge.connected .dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
-
-/* LAYOUT */
 main {
   display: grid;
   grid-template-columns: 280px 1fr;
   overflow: hidden;
 }
-
-/* SIDEBAR */
 .sidebar {
   border-right: 1px solid var(--border);
   display: flex;
@@ -85,18 +78,19 @@ main {
   overflow: hidden;
 }
 
-/* QR */
+/* QR section — hidden by default, shown only when needed */
 #qr-section {
   padding: 16px;
   border-bottom: 1px solid var(--border);
-  display: flex;
+  display: none;          /* hidden until QR event or not connected */
   flex-direction: column;
   align-items: center;
   gap: 8px;
 }
+#qr-section.visible { display: flex; }
 #qr-hint { font-size: 0.65rem; color: var(--muted); text-align: center; line-height: 1.5; }
 .qr-placeholder {
-  width: 120px; height: 120px;
+  width: 148px; height: 148px;
   border: 1px dashed var(--border);
   border-radius: 6px;
   display: flex;
@@ -107,16 +101,14 @@ main {
   text-align: center;
   line-height: 1.6;
 }
-
-#qrcode { 
-  background: white; 
-  padding: 12px; 
-  border-radius: 10px; 
-  display: none; 
-  box-shadow: 0 0 0 4px #fff, 0 0 0 6px var(--green);
+#qrcode {
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  display: none;
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--green);
 }
 
-/* TABS */
 .tabs {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -147,8 +139,6 @@ main {
   margin-left: 4px;
   vertical-align: middle;
 }
-
-/* CHAT LIST */
 #chat-list {
   flex: 1;
   overflow-y: auto;
@@ -175,7 +165,7 @@ main {
   flex-shrink: 0;
 }
 .chat-avatar.personal { background: var(--blue-dim); color: var(--blue); border: 1px solid var(--blue); }
-.chat-avatar.group { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+.chat-avatar.group    { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
 .chat-info { flex: 1; min-width: 0; }
 .chat-name {
   font-size: 0.78rem;
@@ -209,8 +199,6 @@ main {
   color: var(--muted);
   line-height: 1.8;
 }
-
-/* CHAT PANEL */
 .chat-panel {
   display: flex;
   flex-direction: column;
@@ -236,9 +224,7 @@ main {
   font-weight: 600;
 }
 .chat-type-pill.personal { background: var(--blue-dim); color: var(--blue); border: 1px solid var(--blue); }
-.chat-type-pill.group { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
-
-/* MESSAGES */
+.chat-type-pill.group    { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
 #message-area {
   flex: 1;
   overflow-y: auto;
@@ -302,9 +288,24 @@ main {
   margin-top: 3px;
   padding: 0 2px;
 }
-.msg-bubble.outgoing .msg-time { text-align: right; }
 
-/* COMPOSE */
+.msg-bubble.outgoing .msg-time { text-align: right; }
+.msg-img {
+  max-width: 260px;
+  max-height: 220px;
+  width: 100%;
+  border-radius: 8px;
+  display: block;
+  cursor: zoom-in;
+  margin-bottom: 4px;
+  object-fit: cover;
+}
+.msg-caption {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  padding: 4px 2px 0;
+  color: var(--text);
+}
 .compose {
   padding: 14px 16px;
   border-top: 1px solid var(--border);
@@ -345,8 +346,6 @@ main {
 }
 #send-btn:hover { opacity: 0.8; }
 #send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-/* NO SELECTION */
 .no-selection {
   flex: 1;
   display: flex;
@@ -360,8 +359,6 @@ main {
   line-height: 1.8;
 }
 .no-selection .icon { font-size: 3rem; opacity: 0.2; }
-
-/* TOAST */
 #toast {
   position: fixed;
   bottom: 20px; right: 20px;
@@ -380,6 +377,25 @@ main {
 #toast.show { opacity: 1; transform: translateY(0); }
 #toast.success { border-color: var(--green); color: var(--green); }
 #toast.error { border-color: var(--red); color: var(--red); }
+
+#lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+#lightbox.open { display: flex; }
+#lightbox img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+  object-fit: contain;
+  box-shadow: 0 0 60px rgba(0,0,0,0.8);
+}
 </style>
 </head>
 <body>
@@ -396,12 +412,13 @@ main {
 </header>
 
 <main>
-  <!-- SIDEBAR -->
   <div class="sidebar">
+
+    <!-- QR section: hidden by default, shown only when session needs login -->
     <div id="qr-section">
       <div class="qr-placeholder" id="qr-placeholder">Waiting for<br/>QR code...</div>
       <div id="qrcode"></div>
-      <p id="qr-hint">Start server and scan<br/>QR in WhatsApp</p>
+      <p id="qr-hint">Scan QR in WhatsApp<br/>Linked Devices</p>
     </div>
 
     <div class="tabs">
@@ -415,7 +432,6 @@ main {
     </div>
   </div>
 
-  <!-- CHAT PANEL -->
   <div class="chat-panel" id="chat-panel">
     <div class="no-selection">
       <div class="icon">💬</div>
@@ -425,64 +441,86 @@ main {
 </main>
 
 <div id="toast"></div>
+<div id="lightbox"><img id="lightbox-img" src="" alt="" /></div>
 
 <script>
 const socket = io();
 
-// State
-const chats = {};         // jid -> chat object
+const chats = {};
 let activeJid = null;
 let currentFilter = "all";
-let qrDone = false;
+let qrRendered = false;
 
-// DOM
 const statusBadge = document.getElementById("status-badge");
-const statusText = document.getElementById("status-text");
-const chatList = document.getElementById("chat-list");
-const chatPanel = document.getElementById("chat-panel");
+const statusText  = document.getElementById("status-text");
+const chatList    = document.getElementById("chat-list");
+const chatPanel   = document.getElementById("chat-panel");
+const qrSection   = document.getElementById("qr-section");
 
-// ── Socket events ──────────────────────────────────────────────────────────────
+// ── Socket: connection status ──────────────────────────────────────────────────
 socket.on("status", ({ connected, message }) => {
   statusText.textContent = message;
-  statusBadge.className = connected ? "connected" : "";
+  statusBadge.className  = connected ? "connected" : "";
+
   if (connected) {
-    document.getElementById("qr-placeholder").style.display = "none";
-    document.getElementById("qrcode").style.display = "none";
-    document.getElementById("qr-hint").textContent = "Connected";
+    // Session restored or just connected — hide QR entirely
+    qrSection.classList.remove("visible");
   }
 });
 
+// ── Socket: QR code needed (new login required) ────────────────────────────────
 socket.on("qr", (qrData) => {
-  if (qrDone) return;
+  // Show the QR section
+  qrSection.classList.add("visible");
+
+  if (qrRendered) return; // don't render a second canvas on top
   document.getElementById("qr-placeholder").style.display = "none";
   const el = document.getElementById("qrcode");
   el.style.display = "block";
-new QRCode(el, { text: qrData, width: 180, height: 180, colorDark: "#000", colorLight: "#ffffff" });
-  qrDone = true;
+  new QRCode(el, { text: qrData, width: 200, height: 200, colorDark: "#000", colorLight: "#fff" });
+  qrRendered = true;
 });
 
+// ── Socket: chat updated ───────────────────────────────────────────────────────
 socket.on("chat_updated", (summary) => {
   updateChatInList(summary);
   renderChatList();
   updateBadges();
 });
 
+// ── Socket: new message ────────────────────────────────────────────────────────
 socket.on("message", (msg) => {
+  // Ensure chat exists in local state
   if (!chats[msg.jid]) {
-    chats[msg.jid] = { jid: msg.jid, name: msg.jid, type: msg.jid.endsWith("@g.us") ? "group" : "personal", unread: 0, messages: [] };
+    chats[msg.jid] = {
+      jid:      msg.jid,
+      name:     msg.jid,
+      chatType: msg.jid.endsWith("@g.us") ? "group" : "personal",
+      unread:   0,
+      messages: [],
+    };
   }
-  chats[msg.jid].messages.push(msg);
-  chats[msg.jid].lastMessage = msg;
-  if (msg.direction === "incoming") chats[msg.jid].unread++;
+
+  const chat = chats[msg.jid];
+  chat.messages.push(msg);
+  chat.lastMessage = msg;
+
+  // Only increment unread for incoming messages when chat is not active
+  if (msg.direction === "incoming" && msg.jid !== activeJid) {
+    chat.unread++;
+  }
+
+  // Append to open chat panel immediately (both incoming AND outgoing)
   if (msg.jid === activeJid) {
     appendMessage(msg);
-    chats[msg.jid].unread = 0;
+    chat.unread = 0;
   }
+
   renderChatList();
   updateBadges();
 });
 
-// ── Chat list ──────────────────────────────────────────────────────────────────
+// ── Chat list rendering ────────────────────────────────────────────────────────
 function updateChatInList(summary) {
   if (!chats[summary.jid]) {
     chats[summary.jid] = { messages: [], ...summary };
@@ -493,7 +531,7 @@ function updateChatInList(summary) {
 
 function renderChatList() {
   const items = Object.values(chats)
-    .filter(c => currentFilter === "all" || c.type === currentFilter)
+    .filter(c => currentFilter === "all" || c.chatType === currentFilter)
     .sort((a, b) => {
       const ta = a.lastMessage?.timestamp || "";
       const tb = b.lastMessage?.timestamp || "";
@@ -507,18 +545,20 @@ function renderChatList() {
 
   chatList.innerHTML = items.map(chat => {
     const initials = (chat.name || "?").substring(0, 2).toUpperCase();
-    const preview = chat.lastMessage ? escapeHtml(chat.lastMessage.content.substring(0, 40)) : "No messages";
-    const time = chat.lastMessage ? formatTime(chat.lastMessage.timestamp) : "";
-    const unread = chat.unread > 0 ? '<div class="unread-badge">' + chat.unread + '</div>' : "";
-    const active = chat.jid === activeJid ? " active" : "";
-    return '<div class="chat-item' + active + '" data-jid="' + escapeAttr(chat.jid) + '">'
-      + '<div class="chat-avatar ' + chat.type + '">' + initials + '</div>'
+    const preview  = chat.lastMessage ? escapeHtml(chat.lastMessage.content.substring(0, 40)) : "No messages";
+    const time     = chat.lastMessage ? formatTime(chat.lastMessage.timestamp) : "";
+    const unread   = chat.unread > 0 ? '<div class="unread-badge">' + chat.unread + '</div>' : "";
+    const active   = chat.jid === activeJid ? " active" : "";
+    return (
+      '<div class="chat-item' + active + '" data-jid="' + escapeAttr(chat.jid) + '">'
+      + '<div class="chat-avatar ' + (chat.chatType || "personal") + '">' + initials + '</div>'
       + '<div class="chat-info">'
       + '<div class="chat-name">' + escapeHtml(chat.name) + '</div>'
       + '<div class="chat-preview">' + preview + '</div>'
       + '</div>'
       + '<div class="chat-meta"><div class="chat-time">' + time + '</div>' + unread + '</div>'
-      + '</div>';
+      + '</div>'
+    );
   }).join("");
 
   chatList.querySelectorAll(".chat-item").forEach(el => {
@@ -527,29 +567,29 @@ function renderChatList() {
 }
 
 function updateBadges() {
-  const all = Object.values(chats);
-  const personal = all.filter(c => c.type === "personal");
-  const groups = all.filter(c => c.type === "group");
+  const all      = Object.values(chats);
+  const personal = all.filter(c => c.chatType === "personal");
+  const groups   = all.filter(c => c.chatType === "group");
 
   document.getElementById("badge-all").textContent = all.length;
 
   const pb = document.getElementById("badge-personal");
-  pb.textContent = personal.length;
+  pb.textContent   = personal.length;
   pb.style.display = personal.length ? "" : "none";
 
   const gb = document.getElementById("badge-group");
-  gb.textContent = groups.length;
+  gb.textContent   = groups.length;
   gb.style.display = groups.length ? "" : "none";
 }
 
-// ── Open chat ──────────────────────────────────────────────────────────────────
+// ── Open a chat ────────────────────────────────────────────────────────────────
 async function openChat(jid) {
   activeJid = jid;
   const chat = chats[jid];
   if (!chat) return;
   chat.unread = 0;
 
-  // Fetch messages if not loaded
+  // Fetch messages from server if not yet loaded
   if (!chat.messages || chat.messages.length === 0) {
     try {
       const res = await fetch("/api/chats/" + encodeURIComponent(jid) + "/messages");
@@ -562,53 +602,59 @@ async function openChat(jid) {
   updateBadges();
 }
 
+// ── Render the active chat panel ───────────────────────────────────────────────
 function renderChatPanel(chat) {
+  const typeLabel = chat.chatType === "group" ? "Group" : "Personal";
+  const initials  = (chat.name || "?").substring(0, 2).toUpperCase();
+
   chatPanel.innerHTML =
     '<div class="chat-header">'
     + '<div class="chat-header-info">'
-    + '<div class="chat-avatar ' + chat.type + '" style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0;">'
-    + (chat.name || "?").substring(0, 2).toUpperCase()
-    + '</div>'
+    + '<div class="chat-avatar ' + (chat.chatType || "personal") + '" style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0;">' + initials + '</div>'
     + '<div>'
     + '<div class="chat-header-name">' + escapeHtml(chat.name) + '</div>'
     + '<div class="chat-header-jid">' + escapeHtml(chat.jid) + '</div>'
     + '</div>'
     + '</div>'
-    + '<span class="chat-type-pill ' + chat.type + '">' + (chat.type === "group" ? "Group" : "Personal") + '</span>'
+    + '<span class="chat-type-pill ' + (chat.chatType || "personal") + '">' + typeLabel + '</span>'
     + '</div>'
     + '<div id="message-area">'
     + (chat.messages.length === 0 ? '<div class="empty-chat"><div class="icon">💬</div><span>No messages</span></div>' : '')
     + '</div>'
     + '<div class="compose">'
-    + '<textarea id="compose-input" placeholder="Type a message... (Enter to send)"></textarea>'
+    + '<textarea id="compose-input" placeholder="Type a message... (Enter to send, Shift+Enter for newline)"></textarea>'
     + '<button id="send-btn">&#10148;</button>'
     + '</div>';
 
-  const area = chatPanel.querySelector("#message-area");
-  chat.messages.forEach(msg => appendMessageTo(area, msg, chat.type === "group"));
-
-  // Scroll to bottom
-  area.scrollTop = area.scrollHeight;
-
-  // Send handler
+  const area    = chatPanel.querySelector("#message-area");
   const sendBtn = chatPanel.querySelector("#send-btn");
-  const input = chatPanel.querySelector("#compose-input");
+  const input   = chatPanel.querySelector("#compose-input");
+  const isGroup = chat.chatType === "group";
+
+  chat.messages.forEach(msg => appendMessageTo(area, msg, isGroup));
+  area.scrollTop = area.scrollHeight;
 
   async function doSend() {
     const text = input.value.trim();
     if (!text) return;
+
+    // Clear input immediately so it feels responsive
     input.value = "";
     input.style.height = "42px";
     sendBtn.disabled = true;
 
     try {
-      const res = await fetch("/api/send", {
-        method: "POST",
+      const res  = await fetch("/api/send", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jid: activeJid, message: text }),
+        body:    JSON.stringify({ jid: activeJid, message: text }),
       });
       const data = await res.json();
-      if (!data.success) showToast(data.error || "Send failed", "error");
+      if (!data.success) {
+        showToast(data.error || "Send failed", "error");
+      }
+      // Note: the sent message appears via socket.on("message") from the server
+      // so we don't manually append it here to avoid duplicates
     } catch (e) {
       showToast("Network error", "error");
     } finally {
@@ -625,29 +671,59 @@ function renderChatPanel(chat) {
     input.style.height = "42px";
     input.style.height = Math.min(input.scrollHeight, 120) + "px";
   });
+
+  input.focus();
 }
 
+// ── Append a single message to the visible panel ───────────────────────────────
 function appendMessage(msg) {
   if (msg.jid !== activeJid) return;
   const area = document.getElementById("message-area");
   if (!area) return;
   const emptyState = area.querySelector(".empty-chat");
   if (emptyState) emptyState.remove();
-  const chat = chats[msg.jid];
-  appendMessageTo(area, msg, chat && chat.type === "group");
+  const chat    = chats[msg.jid];
+  const isGroup = chat && chat.chatType === "group";
+  appendMessageTo(area, msg, isGroup);
   area.scrollTop = area.scrollHeight;
 }
 
-function appendMessageTo(area, msg, showSender) {
-  const el = document.createElement("div");
-  el.className = "msg-bubble " + msg.direction;
-  const time = formatTime(msg.timestamp);
-  const senderLine = (showSender && msg.direction === "incoming")
+function appendMessageTo(area, msg, isGroup) {
+  const el       = document.createElement("div");
+  el.className   = "msg-bubble " + (msg.direction || "incoming");
+  const time     = formatTime(msg.timestamp);
+  const showSender = isGroup && msg.direction === "incoming";
+  const senderLine = showSender
     ? '<div class="msg-sender">' + escapeHtml(msg.sender) + '</div>'
-    : (msg.direction === "outgoing" ? '<div class="msg-sender">You</div>' : "");
-  el.innerHTML = senderLine
-    + '<div class="msg-body">' + escapeHtml(msg.content) + '</div>'
-    + '<div class="msg-time">' + time + '</div>';
+    : msg.direction === "outgoing"
+      ? '<div class="msg-sender">You</div>'
+      : "";
+
+  let bodyHtml = "";
+  if (msg.type === "image" && msg.mediaPath) {
+    // mediaPath is an absolute local path — convert to /media/<filename>
+    const filename = msg.mediaPath.split("/").pop();
+    const caption  = msg.content && msg.content !== "[image]" ? msg.content : "";
+    bodyHtml =
+      '<div class="msg-body" style="padding:6px;">'
+      + '<img class="msg-img" src="/media/' + escapeAttr(filename) + '" alt="image" />'
+      + (caption ? '<div class="msg-caption">' + escapeHtml(caption) + '</div>' : '')
+      + '</div>';
+  } else {
+    bodyHtml = '<div class="msg-body">' + escapeHtml(msg.content) + '</div>';
+  }
+
+  el.innerHTML = senderLine + bodyHtml + '<div class="msg-time">' + time + '</div>';
+
+  // Lightbox on image click
+  const img = el.querySelector(".msg-img");
+  if (img) {
+    img.addEventListener("click", () => {
+      document.getElementById("lightbox-img").src = img.src;
+      document.getElementById("lightbox").classList.add("open");
+    });
+  }
+
   area.appendChild(el);
 }
 
@@ -661,46 +737,55 @@ document.querySelectorAll(".tab").forEach(tab => {
   });
 });
 
-// ── Utils ──────────────────────────────────────────────────────────────────────
+// ── Utilities ─────────────────────────────────────────────────────────────────
 function formatTime(iso) {
   if (!iso) return "";
-  const d = new Date(iso);
+  const d   = new Date(iso);
   const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  return isToday
+  return d.toDateString() === now.toDateString()
     ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
-
-function escapeHtml(str) {
-  return String(str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function escapeHtml(s) {
+  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
-
-function escapeAttr(str) {
-  return String(str || "").replace(/"/g, "&quot;");
+function escapeAttr(s) {
+  return String(s || "").replace(/"/g, "&quot;");
 }
-
 function showToast(msg, type) {
   const t = document.getElementById("toast");
   t.textContent = msg;
-  t.className = "show " + (type || "");
+  t.className   = "show " + (type || "");
   setTimeout(() => { t.className = ""; }, 2800);
 }
 
-// ── Load existing chats on page load ──────────────────────────────────────────
+// ── On page load: check session and load existing chats ────────────────────────
+fetch("/api/status").then(r => r.json()).then(({ connected }) => {
+  if (connected) {
+    statusText.textContent = "Connected";
+    statusBadge.className  = "connected";
+    // Session alive — QR section stays hidden
+  } else {
+    // Not connected yet — show QR section to prompt login
+    qrSection.classList.add("visible");
+  }
+}).catch(() => {
+  qrSection.classList.add("visible"); // show QR on error too
+});
+
 fetch("/api/chats").then(r => r.json()).then(list => {
   list.forEach(c => { chats[c.jid] = { messages: [], ...c }; });
   renderChatList();
   updateBadges();
 }).catch(() => {});
 
-fetch("/api/status").then(r => r.json()).then(({ connected }) => {
-  if (connected) {
-    statusText.textContent = "Connected";
-    statusBadge.className = "connected";
-    document.getElementById("qr-hint").textContent = "Connected";
-  }
-}).catch(() => {});
+// Lightbox close
+document.getElementById("lightbox").addEventListener("click", () => {
+  document.getElementById("lightbox").classList.remove("open");
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") document.getElementById("lightbox").classList.remove("open");
+});
 </script>
 </body>
 </html>

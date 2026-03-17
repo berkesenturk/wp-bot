@@ -95,3 +95,37 @@ export function getMessageById(id) {
     .prepare("SELECT * FROM messages WHERE id = ?")
     .get(id);
 }
+
+/**
+ * Fetch the most recent N messages per chat for restoring UI state on restart.
+ * Returns rows grouped by chat_id, each with the latest message included.
+ */
+export function getRecentChats(messagesPerChat = 50) {
+  const db = getDb();
+
+  // Get all distinct chat_ids ordered by their latest message
+  const chatIds = db.prepare(`
+    SELECT chat_id, chat_type, MAX(timestamp) as last_ts
+    FROM messages
+    GROUP BY chat_id
+    ORDER BY last_ts DESC
+  `).all();
+
+  const result = [];
+  for (const row of chatIds) {
+    const messages = db.prepare(`
+      SELECT * FROM messages
+      WHERE chat_id = ?
+      ORDER BY timestamp ASC
+      LIMIT ?
+    `).all(row.chat_id, messagesPerChat);
+
+    result.push({
+      chatId:   row.chat_id,
+      chatType: row.chat_type,
+      messages,
+    });
+  }
+
+  return result;
+}
