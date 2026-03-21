@@ -11,10 +11,11 @@
 import { MESSAGE_TYPES, SUPPORTED_BAILEYS_TYPES } from "./types.js";
 
 /**
- * @param {object} rawMsg - Baileys message object from messages.upsert
+ * @param {object} rawMsg        - Baileys message object from messages.upsert
+ * @param {Function} resolveJid  - optional function(jid) => real phone number
  * @returns {NormalizedMessage|null}
  */
-export function normalize(rawMsg) {
+export function normalize(rawMsg, resolveJid = null) {
   try {
     if (!rawMsg?.message) return null;
     if (rawMsg.key?.remoteJid === "status@broadcast") return null;
@@ -28,8 +29,10 @@ export function normalize(rawMsg) {
 
     const jid       = rawMsg.key.remoteJid;
     const chatType  = jid.endsWith("@g.us") ? "group" : "personal";
-    const chatId    = stripJid(jid);
-    const sender    = resolveSender(rawMsg, chatType, jid);
+    const rawChatId = stripJid(jid);
+    // If JID is a @lid, resolve to real phone number via sock contact store
+    const chatId    = resolveJid ? (resolveJid(jid) ?? rawChatId) : rawChatId;
+    const sender    = resolveSender(rawMsg, chatType, jid, resolveJid);
     const timestamp = resolveTimestamp(rawMsg);
 
     const base = {
@@ -95,11 +98,12 @@ function stripJid(jid) {
   return jid ? jid.replace(/@s\.whatsapp\.net|@g\.us|@lid/, "") : jid;
 }
 
-function resolveSender(rawMsg, chatType, jid) {
+function resolveSender(rawMsg, chatType, jid, resolveJid) {
   if (chatType === "group") {
-    return stripJid(rawMsg.key.participant ?? "unknown");
+    const participant = rawMsg.key.participant ?? "unknown";
+    return resolveJid ? (resolveJid(participant) ?? stripJid(participant)) : stripJid(participant);
   }
-  return stripJid(jid);
+  return resolveJid ? (resolveJid(jid) ?? stripJid(jid)) : stripJid(jid);
 }
 
 function resolveTimestamp(rawMsg) {

@@ -136,6 +136,40 @@ async function connectToWhatsApp() {
 
   console.log("[wa] Socket created, waiting for connection.update...");
 
+  // ── Contact store: maps @lid JIDs to real phone numbers ──────────────────
+  const contactStore = {};
+
+  sock.ev.on("contacts.upsert", (contacts) => {
+    for (const c of contacts) {
+      if (c.id && c.notify) {
+        contactStore[c.id] = c.notify;
+        console.log("[contacts] Stored:", c.id, "→", c.notify);
+      }
+    }
+  });
+
+  sock.ev.on("contacts.update", (updates) => {
+    for (const u of updates) {
+      if (u.id && u.notify) {
+        contactStore[u.id] = u.notify;
+      }
+    }
+  });
+
+  // Resolver: given any JID, return clean phone number
+  function resolveJid(jid) {
+    if (!jid) return null;
+    // Try contact store first (resolves @lid to real number)
+    if (contactStore[jid]) return contactStore[jid];
+    // Strip suffix and return raw number
+    const stripped = jid.replace(/@s\.whatsapp\.net|@g\.us|@lid/, "");
+    // @lid numbers are internal IDs — flag them so we know they're unresolved
+    if (jid.endsWith("@lid")) {
+      console.warn("[contacts] Unresolved @lid JID:", jid, "— contact store may not have synced yet");
+    }
+    return stripped;
+  }
+
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
@@ -187,8 +221,8 @@ async function connectToWhatsApp() {
       const fromJid = rawMsg.key?.remoteJid ?? "unknown";
       console.log("[pipeline] Raw message | type:", rawType, "| fromMe:", fromMe, "| from:", fromJid);
 
-      // 1. Normalize
-      const normalized = normalize(rawMsg);
+      // 1. Normalize — pass resolveJid so @lid JIDs become real phone numbers
+      const normalized = normalize(rawMsg, resolveJid);
       if (!normalized) {
         console.log("[pipeline] Normalizer returned null — skipping");
         continue;

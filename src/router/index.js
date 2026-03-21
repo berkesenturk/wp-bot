@@ -1,17 +1,11 @@
 // router/index.js
 //
-// Receives a NormalizedMessage and dispatches it to the correct worker.
-// Workers are stubs for now — they will be wired in Phase 2.
-//
-// Rule: the router only knows about NormalizedMessage shape.
-// It never imports from Baileys.
+// Receives NormalizedMessage, dispatches to correct worker.
+// All text going to LLM is sanitized first — PII never leaves the server raw.
 
 import { MESSAGE_TYPES } from "../normalizer/types.js";
+import { sanitize, rehydrate } from "../privacy/index.js";
 
-/**
- * Dispatch a normalized message to the appropriate worker.
- * @param {NormalizedMessage} msg
- */
 export async function dispatch(msg) {
   if (!msg) return;
 
@@ -19,26 +13,41 @@ export async function dispatch(msg) {
     case MESSAGE_TYPES.TEXT:
       await handleText(msg);
       break;
-
     case MESSAGE_TYPES.IMAGE:
       await handleImage(msg);
       break;
-
     default:
-      // Should not reach here — normalizer already filtered unknowns
       console.warn("[router] No handler for type:", msg.type);
   }
 }
 
-// ── Handlers (stubs — replaced by real workers in Phase 2) ───────────────────
-
 async function handleText(msg) {
-  console.log("[router] TEXT →", msg.chatId, "|", (msg.text ?? "").substring(0, 60));
-  // Phase 2: await llmWorker.process(msg)
+  const { sanitized, map } = sanitize(msg.text, msg.chatId);
+
+  console.log("[router] TEXT →", msg.chatId);
+  console.log("[router]   original: ", msg.text);
+  console.log("[router]   sanitized:", sanitized);
+  console.log("[router]   tokens:   ", map.size > 0 ? Object.fromEntries(map) : "none");
+
+  // Phase 2: wire to LLM
+  // const rawOutput   = await llmWorker.process(sanitized);
+  // const finalOutput = rehydrate(rawOutput, map);
+  // → store finalOutput
 }
 
 async function handleImage(msg) {
-  console.log("[router] IMAGE →", msg.chatId, "| caption:", msg.media?.caption ?? "(none)");
-  // Phase 2: await ocrWorker.process(msg)
-  //   worker will: download file → run OCR → update media_path + status in DB
+  // Sanitize caption/text if present
+  const { sanitized, map } = sanitize(msg.text ?? "", msg.chatId);
+
+  console.log("[router] IMAGE →", msg.chatId);
+  console.log("[router]   text (sanitized):", sanitized || "(none)");
+  console.log("[router]   tokens:          ", map.size > 0 ? Object.fromEntries(map) : "none");
+  console.log("[router]   local path:      ", msg.media?.localPath ?? "not downloaded");
+
+  // Phase 2: wire to OCR + LLM
+  // const ocrText     = await ocrWorker.extract(msg.media.localPath);
+  // const combined    = [ocrText, sanitized].filter(Boolean).join("\n");
+  // const rawOutput   = await llmWorker.process(combined);
+  // const finalOutput = rehydrate(rawOutput, map);
+  // → store finalOutput
 }
