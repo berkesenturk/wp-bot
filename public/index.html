@@ -10,17 +10,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root {
-  --bg: #0d0d0d;
-  --surface: #141414;
-  --surface2: #1c1c1c;
-  --border: #242424;
-  --green: #00e676;
-  --green-dim: rgba(0,230,118,0.1);
-  --blue: #448aff;
-  --blue-dim: rgba(68,138,255,0.1);
-  --red: #ff1744;
-  --text: #e2e2e2;
-  --muted: #555;
+  --bg: #ffffff;
+  --surface: #f5f5f5;
+  --surface2: #ebebeb;
+  --border: #d8d8d8;
+  --green: #00875a;
+  --green-dim: rgba(0,135,90,0.1);
+  --blue: #1565c0;
+  --blue-dim: rgba(21,101,192,0.1);
+  --red: #c62828;
+  --text: #1a1a1a;
+  --muted: #757575;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -106,7 +106,7 @@ main {
   padding: 10px;
   border-radius: 8px;
   display: none;
-  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--green);
+  box-shadow: 0 0 0 3px var(--border), 0 0 0 5px var(--green);
 }
 
 .tabs {
@@ -131,7 +131,7 @@ main {
 .tab .badge {
   display: inline-block;
   background: var(--green);
-  color: #000;
+  color: #fff;
   font-size: 0.55rem;
   font-weight: 700;
   padding: 1px 5px;
@@ -277,6 +277,12 @@ main {
   border: 1px solid var(--border);
   border-top-left-radius: 2px;
 }
+.group.incoming .msg-body {
+  background: var(--green-dim);
+  border: 1px solid var(--green);
+  border-left: 3px solid var(--green);
+  border-top-left-radius: 2px;
+}
 .outgoing .msg-body {
   background: var(--blue-dim);
   border: 1px solid var(--blue);
@@ -334,7 +340,7 @@ main {
 #compose-input:disabled { opacity: 0.4; }
 #send-btn {
   background: var(--green);
-  color: #000;
+  color: #fff;
   border: none;
   width: 42px; height: 42px;
   border-radius: 8px;
@@ -396,6 +402,190 @@ main {
   object-fit: contain;
   box-shadow: 0 0 60px rgba(0,0,0,0.8);
 }
+
+#disconnect-btn, #connect-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, opacity 0.2s;
+  opacity: 0;
+  pointer-events: none;
+}
+#disconnect-btn { border: 1px solid var(--red);   color: var(--red);   }
+#connect-btn    { border: 1px solid var(--green);  color: var(--green); }
+#disconnect-btn:hover { background: var(--red);   color: #fff; }
+#connect-btn:hover    { background: var(--green); color: #fff; }
+#disconnect-btn.visible, #connect-btn.visible { opacity: 1; pointer-events: all; }
+#disconnect-btn .btn-dot, #connect-btn .btn-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+#reset-btn {
+  background: none;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: border-color 0.2s, color 0.2s;
+}
+#reset-btn:hover { border-color: var(--fg); color: var(--fg); }
+
+/* Phone pairing */
+#pair-section { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#pair-label { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 0; }
+#pair-input-row { display: flex; gap: 6px; width: 100%; }
+#pair-phone {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  color: var(--fg); font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+  padding: 5px 8px; border-radius: 6px; outline: none; min-width: 0;
+}
+#pair-phone:focus { border-color: var(--green); }
+#pair-btn {
+  background: none; border: 1px solid var(--green); color: var(--green);
+  font-family: 'JetBrains Mono', monospace; font-size: 0.62rem;
+  letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 10px;
+  border-radius: 6px; cursor: pointer; transition: background 0.2s, color 0.2s; white-space: nowrap;
+}
+#pair-btn:hover { background: var(--green); color: #000; }
+#pair-btn:disabled { opacity: 0.4; cursor: default; }
+#pair-code-box { text-align: center; }
+#pair-code {
+  display: block; font-size: 1.6rem; font-weight: bold; letter-spacing: 0.15em;
+  color: var(--green); margin-bottom: 6px;
+}
+#pair-instructions { font-size: 0.6rem; color: var(--muted); margin: 0; line-height: 1.6; }
+#pair-error { font-size: 0.62rem; color: var(--red); margin: 0; }
+#qr-divider { font-size: 0.58rem; color: var(--muted); letter-spacing: 0.08em; margin: 6px 0 2px; }
+
+/* Monitor panel */
+#monitor-btn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.06em;
+  text-transform: uppercase; padding: 5px 12px; border-radius: 20px; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+#monitor-btn:hover, #monitor-btn.active { border-color: var(--blue); color: var(--blue); }
+#monitor-panel {
+  display: none; flex: 1; flex-direction: column; overflow: hidden; background: var(--bg);
+}
+#monitor-panel.visible { display: flex; }
+.monitor-body {
+  flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.monitor-section { display: flex; flex-direction: column; gap: 10px; }
+.monitor-title {
+  font-family: 'Syne', sans-serif; font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
+}
+.stat-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 18px; min-width: 110px; display: flex; flex-direction: column; gap: 4px;
+}
+.stat-card .stat-value { font-size: 1.5rem; font-weight: 700; font-family: 'Syne', sans-serif; }
+.stat-card .stat-label { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+.stat-card.green .stat-value { color: var(--green); }
+.stat-card.red .stat-value   { color: var(--red); }
+.stat-card.blue .stat-value  { color: var(--blue); }
+.stat-card.yellow .stat-value { color: #ffd740; }
+.progress-bar-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background: var(--green); border-radius: 4px; transition: width 0.4s; }
+.progress-label { font-size: 0.6rem; color: var(--muted); display: flex; justify-content: space-between; }
+.queue-indicator { display: flex; align-items: center; gap: 8px; font-size: 0.7rem; }
+.queue-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.queue-dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.chat-stats-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+.chat-stats-table th {
+  text-align: left; color: var(--muted); font-size: 0.6rem; text-transform: uppercase;
+  letter-spacing: 0.07em; padding: 6px 10px; border-bottom: 1px solid var(--border);
+}
+.chat-stats-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.chat-stats-table tr:last-child td { border-bottom: none; }
+.chat-stats-table tbody tr { cursor: pointer; transition: background 0.15s; }
+.chat-stats-table tbody tr:hover { background: var(--surface); }
+.chat-stats-table tbody tr.selected { background: var(--surface2); border-left: 2px solid var(--blue); }
+#message-detail { display: none; }
+#message-detail.visible { display: block; }
+.msg-detail-header { font-size: 0.65rem; color: var(--blue); margin-bottom: 8px; }
+.msg-list { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.msg-row {
+  display: grid; grid-template-columns: 90px 110px 1fr 60px 28px; gap: 10px; align-items: start;
+  font-size: 0.68rem; padding: 7px 10px; border-radius: 6px; background: var(--surface);
+  border: 1px solid var(--border);
+}
+.msg-delete-btn {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 0.85rem; padding: 0; line-height: 1; transition: color 0.15s;
+  align-self: center;
+}
+.msg-delete-btn:hover { color: var(--red); }
+.detail-actions { display: flex; align-items: center; justify-content: space-between; }
+.delete-all-btn {
+  background: none; border: 1px solid var(--red); color: var(--red);
+  font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.06em;
+  text-transform: uppercase; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.delete-all-btn:hover { background: var(--red); color: #fff; }
+.msg-row .msg-time  { color: var(--muted); font-size: 0.62rem; white-space: nowrap; }
+.msg-row .msg-sender { color: var(--blue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-row .msg-text  { color: var(--text); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.msg-row .msg-state { text-align: right; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; }
+.msg-row .msg-state.indexed { color: var(--green); }
+.msg-row .msg-state.pending { color: #ffd740; }
+.msg-row .msg-state.failed  { color: var(--red); }
+.mini-bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; width: 80px; }
+.mini-bar-fill { height: 100%; background: var(--green); border-radius: 2px; }
+.status-badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.status-badge.active   { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+.status-badge.inactive { background: var(--surface2);  color: var(--muted); border: 1px solid var(--border); }
+.search-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.search-field { display: flex; flex-direction: column; gap: 4px; }
+.search-field label { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.search-field input {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; padding: 7px 12px;
+  border-radius: 6px; outline: none; min-width: 0;
+}
+.search-field input:focus { border-color: var(--blue); }
+.search-field.grow input { width: 280px; }
+#search-run-btn {
+  background: var(--blue); color: #fff; border: none; font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 8px 16px;
+  border-radius: 6px; cursor: pointer; transition: opacity 0.2s; align-self: flex-end;
+}
+#search-run-btn:hover { opacity: 0.85; }
+#search-run-btn:disabled { opacity: 0.35; cursor: default; }
+#search-results { display: flex; flex-direction: column; gap: 6px; }
+.result-row {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px 14px; display: grid; grid-template-columns: 56px 80px 80px 1fr;
+  gap: 12px; align-items: center; font-size: 0.72rem;
+}
+.result-score { font-weight: 700; font-family: 'Syne', sans-serif; font-size: 0.85rem; }
+.result-score.good   { color: var(--green); }
+.result-score.ok     { color: #ffd740; }
+.result-score.poor   { color: var(--red); }
+.result-meta { font-size: 0.6rem; color: var(--muted); line-height: 1.5; }
+.result-text { color: var(--text); line-height: 1.5; word-break: break-word; }
+.no-results { font-size: 0.72rem; color: var(--muted); padding: 16px 0; }
 </style>
 </head>
 <body>
@@ -405,9 +595,14 @@ main {
     <div class="logo-dot"></div>
     WhatsApp Console
   </div>
-  <div id="status-badge">
-    <div class="dot"></div>
-    <span id="status-text">Connecting...</span>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <button id="monitor-btn">⬡ Monitor</button>
+    <button id="connect-btn"><div class="btn-dot"></div>Connect</button>
+    <button id="disconnect-btn"><div class="btn-dot"></div>Disconnect</button>
+    <div id="status-badge">
+      <div class="dot"></div>
+      <span id="status-text">Connecting...</span>
+    </div>
   </div>
 </header>
 
@@ -416,9 +611,25 @@ main {
 
     <!-- QR section: hidden by default, shown only when session needs login -->
     <div id="qr-section">
+      <!-- Phone number pairing (recommended for newer WhatsApp versions) -->
+      <div id="pair-section">
+        <p id="pair-label">Link with phone number</p>
+        <div id="pair-input-row">
+          <input id="pair-phone" type="tel" placeholder="e.g. 32477123456" />
+          <button id="pair-btn">Get Code</button>
+        </div>
+        <div id="pair-code-box" style="display:none">
+          <span id="pair-code"></span>
+          <p id="pair-instructions">Enter this code in WhatsApp →<br/>Linked Devices → Link with phone number</p>
+        </div>
+        <p id="pair-error" style="display:none"></p>
+      </div>
+
+      <div id="qr-divider">— or scan QR —</div>
       <div class="qr-placeholder" id="qr-placeholder">Waiting for<br/>QR code...</div>
       <div id="qrcode"></div>
-      <p id="qr-hint">Scan QR in WhatsApp<br/>Linked Devices</p>
+      <p id="qr-hint">Scan in WhatsApp →<br/>Linked Devices</p>
+      <button id="reset-btn">↺ Reset Session</button>
     </div>
 
     <div class="tabs">
@@ -438,6 +649,82 @@ main {
       Select a chat to view messages
     </div>
   </div>
+
+  <div id="monitor-panel">
+    <div class="monitor-body">
+
+      <!-- Global stats -->
+      <div class="monitor-section">
+        <div class="monitor-title">Embedding index</div>
+        <div class="stat-row" id="global-stats">
+          <div class="stat-card green"><div class="stat-value" id="stat-indexed">—</div><div class="stat-label">Indexed</div></div>
+          <div class="stat-card yellow"><div class="stat-value" id="stat-pending">—</div><div class="stat-label">Pending</div></div>
+          <div class="stat-card red"><div class="stat-value" id="stat-failed">—</div><div class="stat-label">Failed</div></div>
+          <div class="stat-card blue"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total</div></div>
+        </div>
+        <div>
+          <div class="progress-label"><span>Index coverage</span><span id="coverage-pct">—</span></div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="coverage-bar" style="width:0%"></div></div>
+        </div>
+        <div class="queue-indicator">
+          <div class="queue-dot" id="queue-dot"></div>
+          <span id="queue-label">Queue: —</span>
+        </div>
+      </div>
+
+      <!-- Per-chat breakdown -->
+      <div class="monitor-section">
+        <div class="monitor-title">Per-chat breakdown</div>
+        <table class="chat-stats-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Chat</th>
+              <th>Type</th>
+              <th>Indexed</th>
+              <th>Pending</th>
+              <th>Failed</th>
+              <th>Coverage</th>
+            </tr>
+          </thead>
+          <tbody id="chat-stats-body">
+            <tr><td colspan="7" style="color:var(--muted);font-size:0.65rem;padding:16px 10px">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Message detail (shown when a per-chat row is clicked) -->
+      <div class="monitor-section" id="message-detail">
+        <div class="detail-actions">
+          <div class="monitor-title">Messages — <span id="detail-chat-id" style="color:var(--blue)"></span></div>
+          <button class="delete-all-btn" id="delete-all-btn">Delete All</button>
+        </div>
+        <div class="msg-list" id="msg-list"></div>
+      </div>
+
+      <!-- Debug search -->
+      <div class="monitor-section">
+        <div class="monitor-title">Debug search (no LLM)</div>
+        <div class="search-form">
+          <div class="search-field">
+            <label>Chat ID</label>
+            <input id="search-chat-id" type="text" placeholder="e.g. 32477123456" />
+          </div>
+          <div class="search-field grow">
+            <label>Query</label>
+            <input id="search-query" type="text" placeholder="e.g. who approved the order?" />
+          </div>
+          <div class="search-field">
+            <label>Top K</label>
+            <input id="search-k" type="number" value="8" min="1" max="20" style="width:60px" />
+          </div>
+          <button id="search-run-btn">Search</button>
+        </div>
+        <div id="search-results"><div class="no-results">Run a search to see results with distance scores.</div></div>
+      </div>
+
+    </div>
+  </div>
 </main>
 
 <div id="toast"></div>
@@ -451,11 +738,13 @@ let activeJid = null;
 let currentFilter = "all";
 let qrRendered = false;
 
-const statusBadge = document.getElementById("status-badge");
-const statusText  = document.getElementById("status-text");
-const chatList    = document.getElementById("chat-list");
-const chatPanel   = document.getElementById("chat-panel");
-const qrSection   = document.getElementById("qr-section");
+const statusBadge  = document.getElementById("status-badge");
+const statusText   = document.getElementById("status-text");
+const chatList     = document.getElementById("chat-list");
+const chatPanel    = document.getElementById("chat-panel");
+const qrSection    = document.getElementById("qr-section");
+const disconnectBtn = document.getElementById("disconnect-btn");
+const connectBtn    = document.getElementById("connect-btn");
 
 // ── Socket: connection status ──────────────────────────────────────────────────
 socket.on("status", ({ connected, message }) => {
@@ -463,22 +752,99 @@ socket.on("status", ({ connected, message }) => {
   statusBadge.className  = connected ? "connected" : "";
 
   if (connected) {
-    // Session restored or just connected — hide QR entirely
     qrSection.classList.remove("visible");
+    disconnectBtn.classList.add("visible");
+    connectBtn.classList.remove("visible");
+  } else {
+    disconnectBtn.classList.remove("visible");
+    connectBtn.classList.add("visible");
   }
 });
 
 // ── Socket: QR code needed (new login required) ────────────────────────────────
 socket.on("qr", (qrData) => {
-  // Show the QR section
   qrSection.classList.add("visible");
-
-  if (qrRendered) return; // don't render a second canvas on top
   document.getElementById("qr-placeholder").style.display = "none";
   const el = document.getElementById("qrcode");
+  el.innerHTML = ""; // clear expired QR before rendering fresh one
   el.style.display = "block";
-  new QRCode(el, { text: qrData, width: 200, height: 200, colorDark: "#000", colorLight: "#fff" });
+  new QRCode(el, { text: qrData, width: 148, height: 148, colorDark: "#000", colorLight: "#fff" });
   qrRendered = true;
+});
+
+// ── Phone number pairing ───────────────────────────────────────────────────────
+document.getElementById("pair-btn").addEventListener("click", async () => {
+  const phone  = document.getElementById("pair-phone").value.trim();
+  const btn    = document.getElementById("pair-btn");
+  const errEl  = document.getElementById("pair-error");
+  const codeBox = document.getElementById("pair-code-box");
+
+  errEl.style.display  = "none";
+  codeBox.style.display = "none";
+
+  if (!phone) { errEl.textContent = "Enter your phone number first."; errEl.style.display = ""; return; }
+
+  btn.disabled = true;
+  btn.textContent = "...";
+  try {
+    const res  = await fetch("/api/pair", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Request failed");
+    document.getElementById("pair-code").textContent = data.code;
+    codeBox.style.display = "";
+  } catch (err) {
+    errEl.textContent = "❌ " + err.message;
+    errEl.style.display = "";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Get Code";
+  }
+});
+
+// ── Reset session button ───────────────────────────────────────────────────────
+document.getElementById("reset-btn").addEventListener("click", async () => {
+  qrRendered = false;
+  const el = document.getElementById("qrcode");
+  el.innerHTML = "";
+  el.style.display = "none";
+  document.getElementById("qr-placeholder").style.display = "";
+  try {
+    await fetch("/api/reset-auth", { method: "POST" });
+    showToast("Session reset — waiting for QR...");
+  } catch (err) {
+    showToast("Reset failed: " + err.message, "error");
+  }
+});
+
+// ── Connect / Disconnect buttons ──────────────────────────────────────────────
+connectBtn.addEventListener("click", async () => {
+  try {
+    connectBtn.classList.remove("visible");
+    await fetch("/api/connect", { method: "POST" });
+    showToast("Connecting...");
+  } catch (err) {
+    connectBtn.classList.add("visible");
+    showToast("Connect failed: " + err.message, "error");
+  }
+});
+
+disconnectBtn.addEventListener("click", async () => {
+  try {
+    await fetch("/api/disconnect", { method: "POST" });
+    showToast("Session cleared — scan QR to reconnect");
+  } catch (err) {
+    showToast("Disconnect failed: " + err.message, "error");
+  }
+});
+
+// ── Socket: session cleared ────────────────────────────────────────────────────
+socket.on("chats_cleared", () => {
+  for (const key of Object.keys(chats)) delete chats[key];
+  activeJid = null;
+  chatPanel.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:0.75rem;">Select a chat</div>';
+  renderChatList();
+  updateBadges();
+  clearMonitor();
 });
 
 // ── Socket: chat updated ───────────────────────────────────────────────────────
@@ -690,7 +1056,8 @@ function appendMessage(msg) {
 
 function appendMessageTo(area, msg, isGroup) {
   const el       = document.createElement("div");
-  el.className   = "msg-bubble " + (msg.direction || "incoming");
+  el.className   = "msg-bubble " + (msg.direction || "incoming") + (isGroup ? " group" : "");
+  el.dataset.msgId = msg.id;
   const time     = formatTime(msg.timestamp);
   const showSender = isGroup && msg.direction === "incoming";
   const senderLine = showSender
@@ -764,13 +1131,12 @@ fetch("/api/status").then(r => r.json()).then(({ connected }) => {
   if (connected) {
     statusText.textContent = "Connected";
     statusBadge.className  = "connected";
-    // Session alive — QR section stays hidden
+    disconnectBtn.classList.add("visible");
   } else {
-    // Not connected yet — show QR section to prompt login
     qrSection.classList.add("visible");
   }
 }).catch(() => {
-  qrSection.classList.add("visible"); // show QR on error too
+  qrSection.classList.add("visible");
 });
 
 fetch("/api/chats").then(r => r.json()).then(list => {
@@ -785,6 +1151,273 @@ document.getElementById("lightbox").addEventListener("click", () => {
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") document.getElementById("lightbox").classList.remove("open");
+});
+
+// ── Monitor panel ──────────────────────────────────────────────────────────────
+function clearMonitor() {
+  ["stat-indexed","stat-pending","stat-failed","stat-total"].forEach(id => {
+    document.getElementById(id).textContent = "—";
+  });
+  document.getElementById("coverage-pct").textContent = "—";
+  document.getElementById("coverage-bar").style.width = "0%";
+  document.getElementById("queue-dot").className = "queue-dot";
+  document.getElementById("queue-label").textContent = "Queue: —";
+  document.getElementById("chat-stats-body").innerHTML =
+    '<tr><td colspan="7" style="color:var(--muted);font-size:0.65rem;padding:16px 10px">No messages indexed yet.</td></tr>';
+  document.getElementById("message-detail").classList.remove("visible");
+  document.getElementById("search-results").innerHTML =
+    '<div class="no-results">Run a search to see results with distance scores.</div>';
+}
+
+const monitorBtn   = document.getElementById("monitor-btn");
+const monitorPanel = document.getElementById("monitor-panel");
+const chatPanel2   = document.getElementById("chat-panel");
+let monitorOpen    = false;
+let monitorTimer   = null;
+
+monitorBtn.addEventListener("click", () => {
+  monitorOpen = !monitorOpen;
+  monitorPanel.classList.toggle("visible", monitorOpen);
+  chatPanel2.style.display = monitorOpen ? "none" : "";
+  monitorBtn.classList.toggle("active", monitorOpen);
+  if (monitorOpen) { refreshMonitor(); monitorTimer = setInterval(refreshMonitor, 5000); }
+  else             { clearInterval(monitorTimer); }
+});
+
+async function refreshMonitor() {
+  try {
+    const [status, chatStats] = await Promise.all([
+      fetch("/api/search/status").then(r => r.json()),
+      fetch("/api/debug/index-stats").then(r => r.json()),
+    ]);
+
+    // Global stats
+    document.getElementById("stat-indexed").textContent = status.indexed ?? "—";
+    document.getElementById("stat-pending").textContent = status.pending  ?? "—";
+    document.getElementById("stat-failed").textContent  = status.failed   ?? "—";
+    document.getElementById("stat-total").textContent   = status.total    ?? "—";
+
+    const pct = status.total > 0 ? Math.round((status.indexed / status.total) * 100) : 0;
+    document.getElementById("coverage-pct").textContent  = pct + "%";
+    document.getElementById("coverage-bar").style.width  = pct + "%";
+
+    const dot   = document.getElementById("queue-dot");
+    const label = document.getElementById("queue-label");
+    const depth = status.queue_depth ?? 0;
+    const busy  = status.processing;
+    dot.className   = "queue-dot" + (busy ? " active" : "");
+    label.textContent = busy
+      ? "Processing… " + depth + " in queue"
+      : depth > 0 ? depth + " waiting" : "Queue empty";
+
+    // Per-chat table
+    const tbody = document.getElementById("chat-stats-body");
+    if (!chatStats.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);font-size:0.65rem;padding:16px 10px">No messages indexed yet.</td></tr>';
+    } else {
+      tbody.innerHTML = chatStats.map(r => {
+        const coverage     = r.total > 0 ? Math.round((r.indexed / r.total) * 100) : 0;
+        const chatIsActive = r.active === 1;
+        const statusBadge  = chatIsActive
+          ? '<span class="status-badge active">Active</span>'
+          : '<span class="status-badge inactive">Inactive</span>';
+        const rowStyle     = chatIsActive ? '' : ' style="opacity:0.5"';
+        return '<tr data-chat-id="' + escapeAttr(r.chat_id) + '"' + rowStyle + '>'
+          + '<td>' + statusBadge + '</td>'
+          + '<td style="font-size:0.68rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.chat_id) + '</td>'
+          + '<td><span class="chat-type-pill ' + r.chat_type + '">' + r.chat_type + '</span></td>'
+          + '<td style="color:var(--green)">' + r.indexed + '</td>'
+          + '<td style="color:#ffd740">'  + r.pending + '</td>'
+          + '<td style="color:var(--red)">' + r.failed + '</td>'
+          + '<td><div class="mini-bar"><div class="mini-bar-fill" style="width:' + coverage + '%"></div></div><span style="font-size:0.6rem;color:var(--muted);margin-left:6px">' + coverage + '%</span></td>'
+          + '</tr>';
+      }).join("");
+
+      // Attach click handlers for message detail
+      tbody.querySelectorAll("tr[data-chat-id]").forEach(row => {
+        row.addEventListener("click", () => {
+          const wasSelected = row.classList.contains("selected");
+          tbody.querySelectorAll("tr").forEach(r => r.classList.remove("selected"));
+          if (wasSelected) {
+            document.getElementById("message-detail").classList.remove("visible");
+          } else {
+            row.classList.add("selected");
+            loadMessageDetail(row.dataset.chatId);
+          }
+        });
+      });
+    }
+  } catch (e) {
+    console.warn("Monitor refresh failed:", e);
+  }
+}
+
+// ── Message detail loader ─────────────────────────────────────────────────────
+let currentDetailChatId = null;
+
+async function loadMessageDetail(chatId) {
+  currentDetailChatId = chatId;
+  const section = document.getElementById("message-detail");
+  const list    = document.getElementById("msg-list");
+  document.getElementById("detail-chat-id").textContent = chatId;
+  section.classList.add("visible");
+  list.innerHTML = '<div style="color:var(--muted);font-size:0.68rem;padding:8px">Loading...</div>';
+
+  try {
+    const rows = await fetch("/api/debug/messages?chatId=" + encodeURIComponent(chatId) + "&limit=100").then(r => r.json());
+    renderMessageRows(rows, list);
+  } catch (e) {
+    list.innerHTML = '<div style="color:var(--red);font-size:0.68rem;padding:8px">Failed to load messages.</div>';
+  }
+}
+
+function renderMessageRows(rows, list) {
+  if (!rows.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.68rem;padding:8px">No messages found.</div>';
+    return;
+  }
+  const stateLabel = { 1: "indexed", 0: "pending", "-1": "failed" };
+  list.innerHTML = rows.map(m => {
+    const state = stateLabel[String(m.indexed)] ?? "pending";
+    const date  = new Date(m.timestamp * 1000).toLocaleString("en-GB", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
+    const text  = m.text ? escapeHtml(m.text.substring(0, 120)) : (m.media_path ? '<em style="color:var(--muted)">[image]</em>' : '<em style="color:var(--muted)">[no text]</em>');
+    return '<div class="msg-row" data-msg-id="' + escapeAttr(m.id) + '">'
+      + '<span class="msg-time">'   + date                         + '</span>'
+      + '<span class="msg-sender">' + escapeHtml(m.sender)         + '</span>'
+      + '<span class="msg-text">'   + text                         + '</span>'
+      + '<span class="msg-state '   + state + '">' + state         + '</span>'
+      + '<button class="msg-delete-btn" title="Delete message">×</button>'
+      + '</div>';
+  }).join("");
+
+  list.querySelectorAll(".msg-delete-btn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const row = btn.closest(".msg-row");
+      const id  = row.dataset.msgId;
+      btn.disabled = true;
+      btn.textContent = "…";
+      try {
+        const res = await fetch("/api/messages/" + encodeURIComponent(id), { method: "DELETE" });
+        if (!res.ok) throw new Error((await res.json()).error);
+        row.remove();
+        showToast("Message deleted");
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = "×";
+        showToast("Delete failed: " + err.message, "error");
+      }
+    });
+  });
+}
+
+document.getElementById("delete-all-btn").addEventListener("click", async () => {
+  if (!currentDetailChatId) return;
+  const chatId = currentDetailChatId;
+
+  // Build the JID to pass to the endpoint
+  const chatEntry = Object.values(chats).find(c => c.chatId === chatId || c.jid.startsWith(chatId));
+  const jid = chatEntry ? chatEntry.jid : chatId + "@s.whatsapp.net";
+
+  if (!confirm("Delete ALL messages for " + chatId + "? This cannot be undone.")) return;
+
+  const btn = document.getElementById("delete-all-btn");
+  btn.disabled = true;
+  btn.textContent = "Deleting…";
+  try {
+    const res = await fetch("/api/chats/" + encodeURIComponent(jid) + "/messages", { method: "DELETE" });
+    if (!res.ok) throw new Error((await res.json()).error);
+    document.getElementById("msg-list").innerHTML =
+      '<div style="color:var(--muted);font-size:0.68rem;padding:8px">All messages deleted.</div>';
+    showToast("All messages deleted");
+    refreshMonitor();
+  } catch (err) {
+    showToast("Delete failed: " + err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Delete All";
+  }
+});
+
+// ── Socket: message deleted ────────────────────────────────────────────────────
+socket.on("message_deleted", ({ id, chatId }) => {
+  // Remove from in-memory chat arrays (keyed by jid)
+  for (const chat of Object.values(chats)) {
+    if (chat.chatId === chatId || chat.jid.startsWith(chatId)) {
+      chat.messages = chat.messages.filter(m => m.id !== id);
+      if (chat.lastMessage?.id === id) chat.lastMessage = chat.messages.at(-1) ?? null;
+    }
+  }
+  // Remove from open chat panel DOM
+  if (activeJid) {
+    const area = document.getElementById("message-area");
+    if (area) {
+      area.querySelectorAll("[data-msg-id]").forEach(el => {
+        if (el.dataset.msgId === id) el.remove();
+      });
+    }
+  }
+  renderChatList();
+});
+
+socket.on("chat_messages_cleared", ({ jid, chatId }) => {
+  if (chats[jid]) {
+    chats[jid].messages    = [];
+    chats[jid].lastMessage = null;
+    chats[jid].unread      = 0;
+  }
+  if (activeJid === jid) {
+    const area = document.getElementById("message-area");
+    if (area) area.innerHTML = '<div class="empty-chat"><div class="icon">💬</div><span>No messages</span></div>';
+  }
+  renderChatList();
+  updateBadges();
+});
+
+// ── Debug search ───────────────────────────────────────────────────────────────
+document.getElementById("search-run-btn").addEventListener("click", async () => {
+  const chatId  = document.getElementById("search-chat-id").value.trim();
+  const query   = document.getElementById("search-query").value.trim();
+  const k       = document.getElementById("search-k").value || "8";
+  const btn     = document.getElementById("search-run-btn");
+  const results = document.getElementById("search-results");
+
+  if (!chatId || !query) {
+    results.innerHTML = '<div class="no-results" style="color:var(--red)">Enter both Chat ID and Query.</div>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "...";
+  results.innerHTML = '<div class="no-results">Searching…</div>';
+
+  try {
+    const res  = await fetch("/api/debug/search?" + new URLSearchParams({ chatId, q: query, k }));
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error);
+    if (!data.results.length) {
+      results.innerHTML = '<div class="no-results">No results found. Index may be empty for this chat — check the table above.</div>';
+      return;
+    }
+
+    results.innerHTML = data.results.map(r => {
+      const score = r.distance.toFixed(3);
+      const cls   = r.distance < 0.5 ? "good" : r.distance < 0.9 ? "ok" : "poor";
+      return '<div class="result-row">'
+        + '<div class="result-score ' + cls + '">' + score + '</div>'
+        + '<div class="result-meta">' + escapeHtml(r.sender || "?") + '<br/>' + escapeHtml(r.date) + '</div>'
+        + '<div class="result-meta" style="color:var(--muted);font-size:0.58rem">'
+        +   (r.distance < 0.5 ? '● Good' : r.distance < 0.9 ? '◐ Fair' : '○ Weak') + '</div>'
+        + '<div class="result-text">' + escapeHtml(r.text) + '</div>'
+        + '</div>';
+    }).join("");
+  } catch (e) {
+    results.innerHTML = '<div class="no-results" style="color:var(--red)">Error: ' + escapeHtml(e.message) + '</div>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Search";
+  }
 });
 </script>
 </body>

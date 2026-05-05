@@ -144,21 +144,23 @@ export function getUnindexedMessages() {
 }
 
 /**
- * Indexing stats broken down per chat.
+ * Indexing stats broken down per chat, including active status.
  */
 export function getIndexStatsByChat() {
   return getDb().prepare(`
     SELECT
-      chat_id,
-      chat_type,
-      COUNT(*)                                           AS total,
-      SUM(CASE WHEN indexed = 1  THEN 1 ELSE 0 END)     AS indexed,
-      SUM(CASE WHEN indexed = -1 THEN 1 ELSE 0 END)     AS failed,
-      SUM(CASE WHEN indexed = 0  THEN 1 ELSE 0 END)     AS pending,
-      MAX(timestamp)                                     AS last_message_at
-    FROM messages
-    WHERE text IS NOT NULL
-    GROUP BY chat_id
+      m.chat_id,
+      m.chat_type,
+      COUNT(*)                                             AS total,
+      SUM(CASE WHEN m.indexed = 1  THEN 1 ELSE 0 END)     AS indexed,
+      SUM(CASE WHEN m.indexed = -1 THEN 1 ELSE 0 END)     AS failed,
+      SUM(CASE WHEN m.indexed = 0  THEN 1 ELSE 0 END)     AS pending,
+      MAX(m.timestamp)                                     AS last_message_at,
+      COALESCE(cs.active, 0)                               AS active
+    FROM messages m
+    LEFT JOIN chat_settings cs ON cs.chat_id = m.chat_id
+    WHERE m.text IS NOT NULL
+    GROUP BY m.chat_id
     ORDER BY last_message_at DESC
   `).all();
 }
@@ -188,18 +190,19 @@ export function deleteMessagesByChat(chatId) {
 }
 
 /**
- * Indexing health stats — intentionally global, for admin/health dashboard only.
- * Never use this to scope work to a specific chat.
+ * Indexing health stats for active chats only — scoped to active = 1
+ * to match per-chat isolation. Used by the monitor health dashboard.
  */
 export function getIndexStats() {
   const row = getDb().prepare(`
     SELECT
-      COUNT(*)                          AS total,
-      SUM(CASE WHEN indexed = 1  THEN 1 ELSE 0 END) AS indexed,
-      SUM(CASE WHEN indexed = -1 THEN 1 ELSE 0 END) AS failed,
-      SUM(CASE WHEN indexed = 0  THEN 1 ELSE 0 END) AS pending
+      COUNT(*)                                        AS total,
+      SUM(CASE WHEN indexed = 1  THEN 1 ELSE 0 END)  AS indexed,
+      SUM(CASE WHEN indexed = -1 THEN 1 ELSE 0 END)  AS failed,
+      SUM(CASE WHEN indexed = 0  THEN 1 ELSE 0 END)  AS pending
     FROM messages
     WHERE text IS NOT NULL
+      AND chat_id IN (SELECT chat_id FROM chat_settings WHERE active = 1)
   `).get();
   return row;
 }
