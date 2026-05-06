@@ -229,7 +229,7 @@ export function deleteAllFTS() {
  * @returns {Array<{ id, sender, text, timestamp }>}
  */
 export function searchFTS(chatId, query, k = 10) {
-  const clean = query.replace(/[*"^()[\]?]/g, " ").trim();
+  const clean = query.replace(/[*"'^()[\]?]/g, " ").trim();
   if (!clean) return [];
 
   // OR between terms so BM25 ranks partial matches — FTS5 default AND is too strict

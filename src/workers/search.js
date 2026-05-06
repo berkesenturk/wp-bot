@@ -38,10 +38,19 @@ export async function handleSearch(query, chatId, k = 5) {
   }
 
   // Run vector + BM25 in parallel, fuse with RRF
-  const [vectorResults, bm25Results] = await Promise.all([
+  const [vectorResults, bm25RawResults] = await Promise.all([
     search(chatId, queryVector, k * 2),
     Promise.resolve(searchFTS(chatId, query, k * 2)),
   ]);
+
+  // BM25 results come from messages table which stores original (unsanitized) text.
+  // Sanitize them before they enter the context to prevent name exposure.
+  const registryMap = loadMap(chatId);
+  const bm25Results = bm25RawResults.map(r => ({
+    ...r,
+    original_text: r.text,
+    text: sanitizeWithRegistry(r.text ?? "", chatId, registryMap),
+  }));
 
   const results = reciprocalRankFusion(vectorResults, bm25Results, k);
 
@@ -91,10 +100,17 @@ export async function traceSearch(query, chatId, k = 5) {
 
   const queryVector = await embed(sanitizedQuery);
 
-  const [vectorResults, bm25Results] = await Promise.all([
+  const [vectorResults, bm25RawResults] = await Promise.all([
     search(chatId, queryVector, k * 2),
     Promise.resolve(searchFTS(chatId, query, k * 2)),
   ]);
+
+  const traceRegistryMap = loadMap(chatId);
+  const bm25Results = bm25RawResults.map(r => ({
+    ...r,
+    original_text: r.text,
+    text: sanitizeWithRegistry(r.text ?? "", chatId, traceRegistryMap),
+  }));
 
   const results = reciprocalRankFusion(vectorResults, bm25Results, k);
 
@@ -130,6 +146,35 @@ export async function traceSearch(query, chatId, k = 5) {
   return { query, sanitizedQuery, retrievedMessages, prompt, llmRaw, finalAnswer, llmError };
 }
 
+// ── BM25 result sanitizer ─────────────────────────────────────────────────────
+
+/**
+ * Sanitize a BM25 result text string.
+ * BM25 results come from the messages table (original/unsanitized text).
+ * Two passes:
+ *   1. NLP+structural sanitize — catches entities detectable by compromise
+ *   2. Registry pass — replaces any known values (e.g. sender names registered
+ *      via getOrRegisterToken) that NLP may have missed
+ *
+ * @param {string} text
+ * @param {string} chatId
+ * @param {Map<string,string>} registryMap  token → original value
+ * @returns {string}
+ */
+function sanitizeWithRegistry(text, chatId, registryMap) {
+  const { sanitized } = sanitize(text, chatId);
+  let result = sanitized;
+  for (const [token, value] of registryMap.entries()) {
+    if (value && value.length > 2) {
+      result = result.replace(
+        new RegExp("\\b" + value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "gi"),
+        token,
+      );
+    }
+  }
+  return result;
+}
+
 // ── Reciprocal Rank Fusion ────────────────────────────────────────────────────
 
 const RRF_K = 60;
@@ -148,7 +193,7 @@ function reciprocalRankFusion(vectorResults, bm25Results, k) {
     if (scores.has(r.id)) {
       scores.get(r.id).score += contrib;
     } else {
-      scores.set(r.id, { score: contrib, data: { ...r, original_text: r.text } });
+      scores.set(r.id, { score: contrib, data: r });
     }
   });
 
