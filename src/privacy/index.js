@@ -13,8 +13,27 @@
 
 export { loadMap } from "./registry.js";
 
+import { getToken, nextToken, register } from "./registry.js";
 import { stripStructural } from "./structural.js";
 import { stripEntities }   from "./entities.js";
+
+/**
+ * Return the registry token for a value, registering it if it's new.
+ * Used for fields (like sender names) that aren't in message text and
+ * can't be detected by NLP.
+ *
+ * @param {string} chatId
+ * @param {string} value   - raw value (e.g. "Tarık" or "905551234567")
+ * @param {string} type    - entity type: "PERSON" | "PHONE" | "ORG" etc.
+ * @returns {string}       - token like "[PERSON_1]"
+ */
+export function getOrRegisterToken(chatId, value, type = "PERSON") {
+  if (!value || !chatId) return value;
+  const existing = getToken(chatId, value);
+  if (existing) return existing;
+  const token = nextToken(chatId, type);
+  return register(chatId, token, value, type);
+}
 
 /**
  * Sanitize text before sending to an LLM provider.

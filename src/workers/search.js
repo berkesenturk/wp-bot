@@ -7,7 +7,7 @@
 import { embed }    from "./embedder.js";
 import { search }   from "./vectorStore.js";
 import { respond }  from "./llm.js";
-import { sanitize, rehydrate } from "../privacy/index.js";
+import { sanitize, rehydrate, loadMap, getOrRegisterToken } from "../privacy/index.js";
 import { searchFTS } from "../db/messages.js";
 
 /**
@@ -51,24 +51,25 @@ export async function handleSearch(query, chatId, k = 5) {
 
   console.log("[search] Retrieved", results.length, "results");
 
-  // Build context block from retrieved messages
+  // Build context block — use sanitized text and masked sender
   const context = results.map((r, i) => {
     const date   = new Date(r.timestamp * 1000).toLocaleDateString("en-GB", {
       day: "numeric", month: "short", year: "numeric",
     });
-    const sender = r.sender ?? "unknown";
-    // Use original_text (rehydrated) for display
-    const text   = r.original_text ?? r.text ?? "";
+    const sender = r.sender && r.sender !== "me"
+      ? getOrRegisterToken(chatId, r.sender, "PERSON")
+      : (r.sender ?? "unknown");
+    const text   = r.text ?? "";
     return (i + 1) + ". [" + date + " - " + sender + "] " + text;
   }).join("\n");
 
   // Ask LLM to answer using retrieved context
-  const prompt = buildAnswerPrompt(query, context);
+  const prompt = buildAnswerPrompt(sanitizedQuery, context);
 
   let answer;
   try {
     const { reply } = await respond("general", prompt);
-    answer = rehydrate(reply, map);
+    answer = rehydrate(reply, loadMap(chatId));
   } catch (err) {
     // If LLM fails, still return the raw retrieved messages
     console.error("[search] LLM answer failed, returning raw results:", err.message);
@@ -77,6 +78,56 @@ export async function handleSearch(query, chatId, k = 5) {
 
   // Format final reply
   return formatSearchReply(query, sanitizedQuery, answer, results);
+}
+
+// ── Debug trace ──────────────────────────────────────────────────────────────
+
+/**
+ * Same pipeline as handleSearch but returns every intermediate step
+ * for the debug UI (/search-test).
+ */
+export async function traceSearch(query, chatId, k = 5) {
+  const { sanitized: sanitizedQuery, map } = sanitize(query, chatId);
+
+  const queryVector = await embed(sanitizedQuery);
+
+  const [vectorResults, bm25Results] = await Promise.all([
+    search(chatId, queryVector, k * 2),
+    Promise.resolve(searchFTS(chatId, query, k * 2)),
+  ]);
+
+  const results = reciprocalRankFusion(vectorResults, bm25Results, k);
+
+  const maskSender = (s) => s && s !== "me"
+    ? getOrRegisterToken(chatId, s, "PERSON")
+    : (s ?? "unknown");
+
+  const retrievedMessages = results.map(r => ({
+    date:            new Date(r.timestamp * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+    sender:          r.sender ?? "unknown",
+    sanitizedSender: maskSender(r.sender),
+    originalText:    r.original_text ?? r.text ?? "",
+    sanitizedText:   r.text ?? "",
+    distance:        r.distance != null ? parseFloat(r.distance.toFixed(4)) : null,
+  }));
+
+  const context = results.map((r, i) => {
+    const date   = new Date(r.timestamp * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    return (i + 1) + ". [" + date + " - " + maskSender(r.sender) + "] " + (r.text ?? "");
+  }).join("\n");
+
+  const prompt = buildAnswerPrompt(sanitizedQuery, context);
+
+  let llmRaw = null, finalAnswer = null, llmError = null;
+  try {
+    const { reply } = await respond("general", prompt);
+    llmRaw      = reply;
+    finalAnswer = rehydrate(reply, loadMap(chatId));
+  } catch (err) {
+    llmError = err.message;
+  }
+
+  return { query, sanitizedQuery, retrievedMessages, prompt, llmRaw, finalAnswer, llmError };
 }
 
 // ── Reciprocal Rank Fusion ────────────────────────────────────────────────────
