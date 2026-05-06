@@ -20,7 +20,12 @@ export async function useSQLiteAuthState() {
   const readData = (key) => {
     const row = db.prepare("SELECT value FROM auth_state WHERE key = ?").get(key);
     if (!row) return null;
-    return JSON.parse(row.value, BufferJSON.reviver);
+    try {
+      return JSON.parse(row.value, BufferJSON.reviver);
+    } catch {
+      console.warn("[auth] Corrupt auth_state entry for key:", key, "— ignoring");
+      return null;
+    }
   };
 
   const removeData = (key) => {

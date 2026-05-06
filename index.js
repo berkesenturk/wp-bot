@@ -24,9 +24,11 @@ import { init as initEmbedder }                       from "./src/workers/embedd
 import { backfill, checkModelVersion,
          drain, queueDepth, isProcessing as embedBusy } from "./src/workers/embedQueue.js";
 import { getIndexStats, getIndexStatsByChat,
-         deleteMessage, deleteMessagesByChat }           from "./src/db/messages.js";
+         deleteMessage, deleteMessagesByChat,
+         deleteFTS, deleteFTSByChat, deleteAllFTS }      from "./src/db/messages.js";
 import { isActive }                                     from "./src/db/chatSettings.js";
 import { embed }                                       from "./src/workers/embedder.js";
+import { traceSearch }                                     from "./src/workers/search.js";
 import { search as vectorSearch,
          dropAllVectorTables,
          deleteVector, deleteVectorsByChat }            from "./src/workers/vectorStore.js";
@@ -170,12 +172,35 @@ async function connectToWhatsApp() {
   sock = makeWASocket({
     version,
     auth:              state,
-    printQRInTerminal: true,
+    printQRInTerminal: false,
     logger:            pino({ level: "silent" }),
     mobile:            false,
   });
 
   console.log("[wa] Socket created, waiting for connection.update...");
+
+  // Auto-request pairing code on fresh sessions (no stored credentials)
+  if (!state.creds?.me?.id) {
+    const phone = (process.env.PHONE_NUMBER ?? "").replace(/\D/g, "");
+    if (!phone) {
+      console.error("[wa] Fresh session detected but PHONE_NUMBER is not set in .env — cannot request pairing code");
+    } else {
+      try {
+        const code = await sock.requestPairingCode(phone);
+        console.log("[wa] ╔══════════════════════════════════╗");
+        console.log("[wa] ║   WHATSAPP PAIRING CODE          ║");
+        console.log("[wa] ║                                  ║");
+        console.log("[wa] ║   " + code + "                     ║");
+        console.log("[wa] ║                                  ║");
+        console.log("[wa] ║   WhatsApp → Settings →          ║");
+        console.log("[wa] ║   Linked Devices →               ║");
+        console.log("[wa] ║   Link with phone number         ║");
+        console.log("[wa] ╚══════════════════════════════════╝");
+      } catch (err) {
+        console.error("[wa] Failed to request pairing code:", err.message);
+      }
+    }
+  }
 
   // ── Contact / chat name events ────────────────────────────────────────────
   sock.ev.on("contacts.upsert", (contacts) => {
@@ -229,12 +254,6 @@ async function connectToWhatsApp() {
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
     console.log("[wa:connection.update] state:", connection ?? "undefined", "| qr:", !!qr, "| error:", lastDisconnect?.error?.message ?? "none");
 
-    if (qr) {
-      console.log("[wa] QR code received — session could NOT be restored, need fresh login");
-      io.emit("qr", qr);
-      io.emit("status", { connected: false, message: "Scan QR code to connect" });
-    }
-
     if (connection === "open") {
       console.log("[wa] Connection OPEN — session restored successfully");
       console.log("[wa] Logged in as:", sock.user?.id ?? "unknown");
@@ -265,8 +284,8 @@ async function connectToWhatsApp() {
       if (!shouldReconnect) {
         // Session invalidated server-side — clear credentials so next connect shows fresh QR
         getDb().prepare("DELETE FROM auth_state").run();
-        console.log("[wa] Auth state cleared — reconnecting for fresh QR code...");
-        io.emit("status", { connected: false, message: "Session ended. Scan QR to re-link." });
+        console.log("[wa] Auth state cleared — reconnecting for fresh pairing code...");
+        io.emit("status", { connected: false, message: "Session ended. Check server logs for new pairing code." });
         connectToWhatsApp();
       } else {
         io.emit("status", { connected: false, message: "Disconnected. Reconnecting..." });
@@ -433,6 +452,7 @@ app.post("/api/disconnect", async (req, res) => {
     db.prepare("DELETE FROM entity_registry").run();
     db.prepare("DELETE FROM chat_settings").run();
     db.prepare("DELETE FROM meta").run();
+    deleteAllFTS();
 
     // Drop all LanceDB vector tables
     await dropAllVectorTables();
@@ -445,7 +465,7 @@ app.post("/api/disconnect", async (req, res) => {
     for (const key of Object.keys(chats)) delete chats[key];
 
     io.emit("chats_cleared");
-    io.emit("status", { connected: false, message: "Disconnected. Scan QR to reconnect." });
+    io.emit("status", { connected: false, message: "Disconnected. Check server logs for new pairing code." });
     connectToWhatsApp();
     res.json({ success: true });
   } catch (err) {
@@ -477,7 +497,7 @@ app.post("/api/reset-auth", async (req, res) => {
     intentionalDisconnect = true;
     if (sock) { try { await sock.end(); } catch (_) {} }
     getDb().prepare("DELETE FROM auth_state").run();
-    io.emit("status", { connected: false, message: "Session reset. Scan QR to re-link." });
+    io.emit("status", { connected: false, message: "Session reset. Check server logs for new pairing code." });
     connectToWhatsApp();
     res.json({ success: true });
   } catch (err) {
@@ -566,6 +586,18 @@ app.get("/api/debug/search", async (req, res) => {
   }
 });
 
+// ── Search pipeline trace (debug UI) ─────────────────────────────────────────
+app.get("/api/debug/search-trace", async (req, res) => {
+  const { chatId, q, k = "5" } = req.query;
+  if (!chatId || !q) return res.status(400).json({ error: "chatId and q are required" });
+  try {
+    const trace = await traceSearch(q, chatId, parseInt(k, 10));
+    res.json(trace);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Message deletion ──────────────────────────────────────────────────────────
 
 app.delete("/api/messages/:id", async (req, res) => {
@@ -576,6 +608,7 @@ app.delete("/api/messages/:id", async (req, res) => {
     if (!row) return res.status(404).json({ error: "Message not found" });
 
     deleteMessage(id);
+    deleteFTS(id);
     await deleteVector(row.chat_id, id);
 
     const suffix = row.chat_type === "group" ? "@g.us" : "@s.whatsapp.net";
@@ -595,6 +628,7 @@ app.delete("/api/chats/:jid/messages", async (req, res) => {
   const chatId = stripJid(jid);
   try {
     deleteMessagesByChat(chatId);
+    deleteFTSByChat(chatId);
     await deleteVectorsByChat(chatId);
 
     if (chats[jid]) {

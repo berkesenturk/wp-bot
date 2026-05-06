@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search Pipeline Debugger</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    h1 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #f8fafc; }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    input {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      color: #e2e8f0;
+      padding: 9px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus { border-color: #5865f2; }
+    input#chatId { width: 240px; }
+    input#query  { flex: 1; min-width: 260px; }
+
+    button {
+      background: #5865f2;
+      color: #fff;
+      border: none;
+      padding: 9px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:hover   { background: #4752c4; }
+    button:disabled { background: #2d3148; color: #6b7280; cursor: not-allowed; }
+
+    .status {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 20px;
+      min-height: 18px;
+    }
+    .status.error { color: #f87171; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .grid.wide { grid-template-columns: 1fr; }
+
+    .panel {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 10px 14px;
+      background: #252840;
+      border-bottom: 1px solid #2d3148;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .panel-header .badge {
+      background: #5865f2;
+      color: #fff;
+      font-size: 11px;
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    .panel-body {
+      padding: 14px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #cbd5e1;
+    }
+
+    .msg-list { list-style: none; }
+    .msg-item {
+      padding: 8px 0;
+      border-bottom: 1px solid #2d3148;
+    }
+    .msg-item:last-child { border-bottom: none; }
+    .msg-meta {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 3px;
+      display: flex;
+      gap: 12px;
+    }
+    .msg-meta span { }
+    .msg-meta .dist { color: #a78bfa; }
+    .msg-text { color: #e2e8f0; margin-bottom: 2px; }
+    .msg-sanitized { color: #94a3b8; font-style: italic; font-size: 12px; }
+
+    .diff-tag {
+      display: inline-block;
+      background: #78350f;
+      color: #fcd34d;
+      border-radius: 3px;
+      padding: 0 4px;
+      font-size: 11px;
+      font-family: monospace;
+    }
+
+    .empty { color: #4b5563; font-style: italic; padding: 8px 0; }
+
+    .sections { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+
+<h1>Search Pipeline Debugger</h1>
+
+<div class="input-row">
+  <input id="chatId" type="text" placeholder="Chat ID" />
+  <input id="query"  type="text" placeholder="Search query…" />
+  <button id="btn" onclick="runTrace()">Search</button>
+</div>
+
+<div class="status" id="status"></div>
+
+<div class="sections" id="results" style="display:none">
+
+  <div class="grid">
+    <!-- Sanitized query -->
+    <div class="panel" id="panelSanitized">
+      <div class="panel-header">Sanitized Query</div>
+      <div class="panel-body" id="sanitizedBody"></div>
+    </div>
+
+    <!-- Retrieved messages -->
+    <div class="panel">
+      <div class="panel-header">
+        Retrieved Messages
+        <span class="badge" id="msgCount">0</span>
+      </div>
+      <div class="panel-body" id="messagesBody"></div>
+    </div>
+  </div>
+
+  <!-- LLM prompt -->
+  <div class="panel">
+    <div class="panel-header">LLM Input — Full Prompt</div>
+    <div class="panel-body"><pre id="promptBody"></pre></div>
+  </div>
+
+  <div class="grid">
+    <!-- LLM raw output -->
+    <div class="panel">
+      <div class="panel-header">LLM Raw Output</div>
+      <div class="panel-body"><pre id="llmRawBody"></pre></div>
+    </div>
+
+    <!-- Final answer -->
+    <div class="panel">
+      <div class="panel-header">Final Answer <span style="color:#6b7280;font-size:11px;text-transform:none;letter-spacing:0">(after PII rehydration)</span></div>
+      <div class="panel-body"><pre id="finalBody"></pre></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+async function runTrace() {
+  const chatId = document.getElementById('chatId').value.trim();
+  const query  = document.getElementById('query').value.trim();
+  const status = document.getElementById('status');
+  const btn    = document.getElementById('btn');
+
+  if (!chatId || !query) {
+    setStatus('Chat ID and query are required.', true);
+    return;
+  }
+
+  btn.disabled = true;
+  document.getElementById('results').style.display = 'none';
+  setStatus('Running pipeline…');
+
+  try {
+    const res  = await fetch('/api/debug/search-trace?' + new URLSearchParams({ chatId, q: query }));
+    const data = await res.json();
+
+    if (!res.ok) {
+      setStatus('Error: ' + (data.error ?? res.statusText), true);
+      btn.disabled = false;
+      return;
+    }
+
+    renderResults(data);
+    setStatus('Done — ' + (data.retrievedMessages?.length ?? 0) + ' messages retrieved.');
+  } catch (err) {
+    setStatus('Request failed: ' + err.message, true);
+  }
+
+  btn.disabled = false;
+}
+
+function renderResults(d) {
+  // ── Sanitized query ──────────────────────────────────────────────────────
+  const sanitizedEl = document.getElementById('sanitizedBody');
+  if (d.sanitizedQuery === d.query) {
+    sanitizedEl.innerHTML = '<span style="color:#4ade80">No PII detected — query unchanged.</span><br><br><code style="color:#e2e8f0">' + esc(d.query) + '</code>';
+  } else {
+    sanitizedEl.innerHTML =
+      '<div style="margin-bottom:8px"><span style="color:#94a3b8;font-size:11px">ORIGINAL</span><br>' + esc(d.query) + '</div>' +
+      '<div><span style="color:#fbbf24;font-size:11px">SANITIZED</span><br>' + highlightTokens(d.sanitizedQuery) + '</div>';
+  }
+
+  // ── Retrieved messages ────────────────────────────────────────────────────
+  const msgs = d.retrievedMessages ?? [];
+  document.getElementById('msgCount').textContent = msgs.length;
+  const msgsEl = document.getElementById('messagesBody');
+  if (!msgs.length) {
+    msgsEl.innerHTML = '<div class="empty">No messages found.</div>';
+  } else {
+    msgsEl.innerHTML = '<ul class="msg-list">' + msgs.map((m, i) => {
+      const changed = m.originalText !== m.sanitizedText;
+      const distLabel = m.distance != null ? '<span class="dist">dist ' + m.distance + '</span>' : '';
+      return '<li class="msg-item">' +
+        '<div class="msg-meta"><span>#' + (i+1) + '</span><span>' + esc(m.date) + '</span><span>' + esc(m.sender) + '</span>' + distLabel + '</div>' +
+        '<div class="msg-text">' + esc(m.originalText) + '</div>' +
+        (changed ? '<div class="msg-sanitized">→ ' + highlightTokens(m.sanitizedText) + '</div>' : '') +
+        '</li>';
+    }).join('') + '</ul>';
+  }
+
+  // ── Prompt ────────────────────────────────────────────────────────────────
+  document.getElementById('promptBody').textContent = d.prompt ?? '';
+
+  // ── LLM raw output ────────────────────────────────────────────────────────
+  const rawEl = document.getElementById('llmRawBody');
+  if (d.llmError) {
+    rawEl.textContent = 'ERROR: ' + d.llmError;
+    rawEl.style.color = '#f87171';
+  } else {
+    rawEl.style.color = '';
+    rawEl.textContent = d.llmRaw ?? '(empty)';
+  }
+
+  // ── Final answer ──────────────────────────────────────────────────────────
+  const finalEl = document.getElementById('finalBody');
+  if (d.finalAnswer && d.finalAnswer !== d.llmRaw) {
+    finalEl.innerHTML = '<span style="color:#4ade80;font-size:11px">PII tokens restored ↓</span>\n\n' + esc(d.finalAnswer);
+  } else {
+    finalEl.textContent = d.finalAnswer ?? '(empty)';
+  }
+
+  document.getElementById('results').style.display = 'flex';
+}
+
+function setStatus(msg, isError) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status' + (isError ? ' error' : '');
+}
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function highlightTokens(str) {
+  return esc(str).replace(/\[(PERSON|ORG|LOC|PHONE|EMAIL|IBAN|CARD|IP|VAT)_\d+\]/g,
+    m => '<span class="diff-tag">' + m + '</span>');
+}
+
+document.getElementById('query').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runTrace();
+});
+
+// Pre-fill chat ID from URL param if present
+const params = new URLSearchParams(location.search);
+if (params.get('chatId')) document.getElementById('chatId').value = params.get('chatId');
+if (params.get('q'))      document.getElementById('query').value  = params.get('q');
+</script>
+</body>
+</html>

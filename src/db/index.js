@@ -37,14 +37,15 @@ export function initDb() {
       media_path     TEXT,
       status         TEXT NOT NULL DEFAULT 'pending'
                        CHECK(status IN ('pending','processing','done','failed')),
+      indexed        INTEGER NOT NULL DEFAULT 0,  -- 0=pending, 1=done, -1=failed
       created_at     INTEGER NOT NULL DEFAULT (strftime('%s','now'))
     );
- 
+
     CREATE INDEX IF NOT EXISTS idx_messages_chat   ON messages(chat_id);
     CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);
     CREATE INDEX IF NOT EXISTS idx_messages_ts     ON messages(timestamp DESC);
   `);
- 
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS entity_registry (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,8 +63,41 @@ export function initDb() {
     CREATE INDEX IF NOT EXISTS idx_registry_token ON entity_registry(chat_id, token);
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_settings (
+      chat_id      TEXT PRIMARY KEY,
+      active       INTEGER NOT NULL DEFAULT 0,
+      activated_by TEXT,
+      activated_at INTEGER,
+      updated_at   INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+
+  db.exec(`
+    CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+      msg_id   UNINDEXED,
+      chat_id  UNINDEXED,
+      text,
+      tokenize = 'unicode61'
+    );
+  `);
+
   console.log("[db] SQLite ready at", DB_PATH);
   return db;
+}
 
-  
+export function getMeta(key) {
+  const row = getDb().prepare("SELECT value FROM meta WHERE key = ?").get(key);
+  return row ? row.value : null;
+}
+
+export function setMeta(key, value) {
+  getDb().prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run(key, String(value));
 }
