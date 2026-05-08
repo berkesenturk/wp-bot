@@ -1,0 +1,13 @@
+.git
+.gitignore
+.claude/
+.env
+.env.*
+*.md
+data/
+media/
+node_modules/
+*.log
+src/test/
+infra/
+.DS_Store
