@@ -75,7 +75,8 @@ if [ ! -f /etc/wp-bot.env ]; then
 API_KEY=REPLACE_WITH_YOUR_API_KEY
 PHONE_NUMBER=90XXXXXXXXXX
 ENV
-  chmod 600 /etc/wp-bot.env
+  chown root:${EC2_USER} /etc/wp-bot.env
+  chmod 640 /etc/wp-bot.env
 fi
 
 echo "==> [7/9] Install wp CLI"
