@@ -14,7 +14,3 @@ variable "api_key" {
   description = "LLM API key — written to /etc/wp-bot.env on EC2, never stored in state plaintext"
   sensitive   = true
 }
-
-variable "phone_number" {
-  description = "WhatsApp phone number for initial pairing (e.g. 905551234567)"
-}

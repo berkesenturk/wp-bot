@@ -1,6 +1,6 @@
 output "ec2_host" {
-  description = "Elastic IP — add as EC2_HOST GitHub Actions secret"
-  value       = aws_eip.wp_bot.public_ip
+  description = "Public IP — add as EC2_HOST GitHub Actions secret (update if instance is stopped/restarted)"
+  value       = aws_instance.wp_bot.public_ip
 }
 
 output "ec2_ssh_key" {
@@ -11,5 +11,5 @@ output "ec2_ssh_key" {
 
 output "ssh_command" {
   description = "Ready-to-use SSH command"
-  value       = "ssh -i <(terraform output -raw ec2_ssh_key) ec2-user@${aws_eip.wp_bot.public_ip}"
+  value       = "ssh -i <(terraform output -raw ec2_ssh_key) ec2-user@${aws_instance.wp_bot.public_ip}"
 }

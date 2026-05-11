@@ -65,52 +65,24 @@ resource "aws_instance" "wp_bot" {
   vpc_security_group_ids = [aws_security_group.wp_bot.id]
 
   root_block_device {
-    volume_size = 10   # 10 GB root + 20 GB data = 30 GB free-tier limit
+    volume_size = 20   # 20 GB root — within free-tier limit
     volume_type = "gp2"
   }
 
-  # Runs once on first boot — installs Docker, mounts EBS, writes secrets
   user_data = <<-USERDATA
     #!/bin/bash
     set -e
-
-    # Wait for EBS attachment to settle
-    sleep 15
-
     curl -fsSL "https://raw.githubusercontent.com/${var.github_repo}/main/scripts/ec2-setup.sh" \
       -o /tmp/ec2-setup.sh
 
     bash /tmp/ec2-setup.sh "${var.github_repo}"
 
-    # Overwrite the placeholder env file with real secrets
+    # Write real API key
     cat > /etc/wp-bot.env <<ENV
 API_KEY=${var.api_key}
-PHONE_NUMBER=${var.phone_number}
 ENV
     chmod 600 /etc/wp-bot.env
   USERDATA
 
   tags = { Name = "wp-bot" }
-}
-
-# ── EBS data volume (persistent app state, separate from root) ────────────────
-resource "aws_ebs_volume" "wp_bot_data" {
-  availability_zone = aws_instance.wp_bot.availability_zone
-  size              = 20
-  type              = "gp2"
-  tags              = { Name = "wp-bot-data" }
-}
-
-resource "aws_volume_attachment" "wp_bot_data" {
-  device_name  = "/dev/xvdf"
-  volume_id    = aws_ebs_volume.wp_bot_data.id
-  instance_id  = aws_instance.wp_bot.id
-  force_detach = false
-}
-
-# ── Elastic IP ────────────────────────────────────────────────────────────────
-resource "aws_eip" "wp_bot" {
-  instance = aws_instance.wp_bot.id
-  domain   = "vpc"
-  tags     = { Name = "wp-bot-eip" }
 }
