@@ -178,28 +178,8 @@ async function connectToWhatsApp() {
   });
 
   console.log("[wa] Socket created, waiting for connection.update...");
-
-  // Auto-request pairing code on fresh sessions (no stored credentials)
   if (!state.creds?.me?.id) {
-    const phone = (process.env.PHONE_NUMBER ?? "").replace(/\D/g, "");
-    if (!phone) {
-      console.error("[wa] Fresh session detected but PHONE_NUMBER is not set in .env — cannot request pairing code");
-    } else {
-      try {
-        const code = await sock.requestPairingCode(phone);
-        console.log("[wa] ╔══════════════════════════════════╗");
-        console.log("[wa] ║   WHATSAPP PAIRING CODE          ║");
-        console.log("[wa] ║                                  ║");
-        console.log("[wa] ║   " + code + "                     ║");
-        console.log("[wa] ║                                  ║");
-        console.log("[wa] ║   WhatsApp → Settings →          ║");
-        console.log("[wa] ║   Linked Devices →               ║");
-        console.log("[wa] ║   Link with phone number         ║");
-        console.log("[wa] ╚══════════════════════════════════╝");
-      } catch (err) {
-        console.error("[wa] Failed to request pairing code:", err.message);
-      }
-    }
+    console.log("[wa] Fresh session — run: wp pair <phone>  to link your WhatsApp account");
   }
 
   // ── Contact / chat name events ────────────────────────────────────────────
@@ -478,9 +458,9 @@ app.post("/api/disconnect", async (req, res) => {
 app.post("/api/pair", async (req, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: "phone is required" });
-  if (!sock)  return res.status(503).json({ error: "WhatsApp socket not ready" });
+  if (!sock)  return res.status(503).json({ error: "WhatsApp socket not ready — server still starting" });
+  if (sock.user) return res.status(409).json({ error: "already_connected", id: sock.user.id });
 
-  // Strip any non-digit characters
   const digits = phone.replace(/\D/g, "");
   try {
     const code = await sock.requestPairingCode(digits);
@@ -662,8 +642,11 @@ process.on("SIGTERM", shutdown);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, async () => {
+httpServer.listen(PORT, () => {
   console.log("[server] Running at http://localhost:" + PORT);
-  await startup();          // load embedder, backfill missed messages
-  connectToWhatsApp();      // then connect to WhatsApp
+  // Connect to WhatsApp immediately so pairing works right away.
+  // Embedder init runs in parallel — search won't work until it finishes
+  // but the bot can pair and receive messages from the start.
+  connectToWhatsApp();
+  startup().catch(err => console.error("[startup] Fatal:", err.message));
 });

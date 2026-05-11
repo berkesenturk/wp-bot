@@ -4,7 +4,9 @@
 // Model: paraphrase-multilingual-MiniLM-L12-v2 (384-dim, ~470MB on first download, 50+ languages including Turkish)
 // Runs entirely in-process — no API calls, no PII leaves the machine.
 
-import { pipeline } from "@xenova/transformers";
+import { pipeline, env } from "@xenova/transformers";
+
+if (process.env.XENOVA_CACHE_DIR) env.cacheDir = process.env.XENOVA_CACHE_DIR;
 
 let embedder  = null;
 let isReady   = false;
