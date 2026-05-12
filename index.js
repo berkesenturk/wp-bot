@@ -475,6 +475,33 @@ app.post("/api/disconnect", async (req, res) => {
   }
 });
 
+app.post("/api/wipe-data", async (req, res) => {
+  try {
+    console.log("[server] Data wipe requested — messages and vectors will be deleted, session preserved");
+
+    drain(); // stop embedding queue before the data it references is gone
+
+    const db = getDb();
+    db.prepare("DELETE FROM messages").run();
+    db.prepare("DELETE FROM entity_registry").run();
+    deleteAllFTS();
+
+    await dropAllVectorTables();
+
+    fs.rmSync(MEDIA_DIR, { recursive: true, force: true });
+    fs.mkdirSync(MEDIA_DIR, { recursive: true });
+
+    for (const key of Object.keys(chats)) delete chats[key];
+    io.emit("chats_cleared");
+
+    console.log("[server] Data wipe complete — WhatsApp session and chat settings preserved");
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[server] Wipe error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/pair", async (req, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: "phone is required" });

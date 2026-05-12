@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# wp — WhatsApp bot CLI for EC2
+# wp — WhatsApp bot CLI
 # Usage: wp <command> [args]
+#   wp start              start bot server locally (dev mode, foreground)
 #   wp status             show connection + indexing status
 #   wp pair [phone]       link a WhatsApp account (interactive if phone omitted)
 #   wp connect            reconnect to WhatsApp
 #   wp reset              clear WhatsApp session (keeps messages and vectors)
 #   wp disconnect         logout and wipe ALL data (prompts for confirmation)
-#   wp logs [-f]          show container logs (pass -f to follow)
+#   wp wipe               delete all messages and vectors (keeps session and settings)
+#   wp logs [-f]          show Docker container logs (pass -f to follow)
 #   wp index              show embedding index health
 set -euo pipefail
 
@@ -26,9 +28,17 @@ _is_connected() {
   curl -sf "${API}/status" 2>/dev/null | grep -q '"connected":true'
 }
 
+_require_server() {
+  curl -sf "${API}/status" >/dev/null 2>&1 && return 0
+  echo "Error: bot server not reachable at ${API}" >&2
+  echo "       Start it with:  npm run dev   (or npm start)" >&2
+  exit 1
+}
+
 case "${1:-help}" in
 
   status)
+    _require_server
     echo "=== Connection ==="
     curl -sf "${API}/status" | json
     echo ""
@@ -120,17 +130,20 @@ case "${1:-help}" in
     ;;
 
   connect)
+    _require_server
     echo "Reconnecting..."
     curl -sf -X POST "${API}/connect" | json
     ;;
 
   reset)
+    _require_server
     echo "Clearing WhatsApp session (messages and vectors are preserved)..."
     curl -sf -X POST "${API}/reset-auth" | json
     echo "Session cleared. Run 'wp pair' to re-link."
     ;;
 
   disconnect)
+    _require_server
     echo "WARNING: This will logout and delete ALL messages, vectors, and session data."
     read -r -p "Type 'yes' to confirm: " CONFIRM
     if [ "${CONFIRM}" != "yes" ]; then
@@ -140,17 +153,50 @@ case "${1:-help}" in
     curl -sf -X POST "${API}/disconnect" | json
     ;;
 
+  wipe)
+    _require_server
+    echo "WARNING: This will permanently delete all messages, vectors, and media files."
+    echo "         Your WhatsApp session and chat activation settings will be preserved."
+    read -r -p "Type 'yes' to confirm: " CONFIRM
+    if [ "${CONFIRM}" != "yes" ]; then
+      echo "Aborted."
+      exit 0
+    fi
+    curl -sf -X POST "${API}/wipe-data" | json
+    echo "Done. Messages, vectors, and media deleted. Session intact."
+    ;;
+
   logs)
     shift
-    docker logs "${@}" wp-bot
+    if command -v docker &>/dev/null && docker inspect wp-bot &>/dev/null 2>&1; then
+      docker logs "${@}" wp-bot
+    else
+      echo "Error: Docker container 'wp-bot' not found." >&2
+      echo "       For local dev, view logs in the terminal running 'npm run dev'." >&2
+      exit 1
+    fi
     ;;
 
   index)
+    _require_server
     curl -sf "${API}/search/status" | json
     ;;
 
+  start)
+    # Local dev only — starts the Node server in the foreground.
+    # On EC2 the container is managed by Docker; use 'docker compose up -d'.
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    BOT_DIR="$(dirname "${SCRIPT_DIR}")"
+    if ! [ -f "${BOT_DIR}/package.json" ]; then
+      echo "Error: cannot locate wp-bot project directory (expected parent of scripts/)." >&2
+      exit 1
+    fi
+    echo "Starting bot in dev mode (Ctrl-C to stop)..."
+    exec node --watch "${BOT_DIR}/index.js"
+    ;;
+
   help|--help|-h)
-    sed -n '3,12p' "$0"
+    sed -n '3,11p' "$0"
     ;;
 
   *)
