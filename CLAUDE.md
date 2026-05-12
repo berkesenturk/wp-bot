@@ -42,17 +42,16 @@ The app is a self-hosted WhatsApp AI assistant. `index.js` is the single entry p
 Every incoming WhatsApp message flows:
 
 1. **Baileys** → raw `messages.upsert` event
-2. **Merger** (`src/merger/index.js`) — buffers consecutive messages from the same sender; flushes after `MERGE_WINDOW_MS` (default 3 s) of silence as a single merged message
-3. **Normalizer** (`src/normalizer/index.js`) — pure function, converts raw Baileys object to a `NormalizedMessage`. Returns `null` for unsupported types.
+2. **Normalizer** (`src/normalizer/index.js`) — pure function, converts raw Baileys object to a `NormalizedMessage`. Returns `null` for unsupported types.
+3. **Active gate** (`index.js`) — if chat is not active: lifecycle commands (`@bot start/stop/status`) are handled and replied to inline; all other messages are silently dropped with no further I/O. Nothing is written to disk or emitted to the UI for inactive chats.
 4. **Media download** — images written to `media/` immediately, path stored on the normalized object.
-5. **SQLite insert** (`src/db/messages.js`) — persisted before any processing.
-6. **Socket.IO emit** — `message` and `chat_updated` events pushed to the browser UI.
-7. **Router dispatch** (`src/router/index.js`) — routes by message type to `handleText` or `handleImage`.
-8. Inside `handleText`:
-   - Lifecycle commands (`@bot start/stop/status`) — always handled, bypass active gate
-   - **Active gate** — silent drop if bot not started in this chat
+5. **Socket.IO emit** — `message` and `chat_updated` events pushed to the browser UI.
+6. **Merger** (`src/merger/index.js`) — buffers the normalized message; after `MERGE_WINDOW_MS` (default 3 s) of silence from the same sender, flushes as a single merged message.
+7. **SQLite insert** (`src/db/messages.js`) — persisted after the merge window closes.
+8. **Router dispatch** (`src/router/index.js`) — routes by message type to `handleText` or `handleImage`.
+9. Inside `handleText`:
    - Static keyword replies (hi/hello/hey/help/ping) — answered without LLM
-   - Privacy sanitize → enqueue for embedding (active chats only)
+   - Privacy sanitize → enqueue for embedding
    - `@bot search` → `src/workers/search.js` — vector + BM25 in parallel, fused via RRF, then LLM answer
    - `@bot debug <query>` → raw vector retrieval with distance scores, no LLM
    - `@bot summarize/tasks/extract/<general>` → `src/workers/llm.js` → rehydrate → reply
@@ -60,7 +59,7 @@ Every incoming WhatsApp message flows:
 
 ### Merger (`src/merger/index.js`)
 
-Buffers consecutive messages from the same sender in a given chat. After `MERGE_WINDOW_MS` ms of inactivity the buffer flushes as one merged message (text parts joined with newlines, last image preserved). This prevents the rest of the pipeline from seeing burst messages as separate events.
+Buffers consecutive messages from the same sender in a given chat. After `MERGE_WINDOW_MS` ms of inactivity the buffer flushes as one merged message (text parts joined with newlines, last image preserved). Runs after the active gate, so only messages from active chats are buffered.
 
 ### Privacy / PII layer (`src/privacy/`)
 
@@ -109,6 +108,7 @@ POST /api/pair                    — request WhatsApp pairing code
 POST /api/connect                 — trigger reconnect
 POST /api/reset-auth              — clear session (messages + vectors preserved)
 POST /api/disconnect              — logout + wipe ALL data
+POST /api/wipe-data               — delete messages/vectors/media (session + settings preserved)
 GET  /api/search/status           — indexing health: { total, indexed, failed, pending, queue_depth, processing }
 GET  /api/debug/search            — raw vector search with distance scores (?chatId=&q=&k=10)
 GET  /api/debug/search-trace      — verbose search trace for tuning

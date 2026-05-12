@@ -84,6 +84,7 @@ npm start
 | `wp connect` | Trigger reconnect |
 | `wp reset` | Clear session (messages and vectors preserved) |
 | `wp disconnect` | Logout and wipe ALL data |
+| `wp wipe` | Delete all messages and vectors (session and settings preserved) |
 | `wp logs [-f]` | Docker container logs |
 | `wp index` | Embedding index health |
 
@@ -136,22 +137,24 @@ Every incoming message flows through this sequence:
 ```
 WhatsApp (Baileys)
       ↓
-Merger              — buffers consecutive messages from same sender (3 s window)
-      ↓
 Normalizer          — converts raw Baileys object to clean NormalizedMessage
+      ↓
+Active gate         — inactive chats: @bot start/stop/status handled, everything else dropped
       ↓
 Media download      — images saved to /media immediately (not lazy)
       ↓
-SQLite insert       — persisted before any processing
-      ↓
 UI update           — pushed to browser via Socket.IO
       ↓
-Router              — lifecycle gate → active gate → @bot dispatch
+Merger              — buffers consecutive messages from same sender (3 s window)
       ↓
-Workers             — embedding queue, LLM calls, search
+SQLite insert       — persisted after merge window closes
+      ↓
+Router              — @bot dispatch → Workers
 ```
 
 The normalizer is a pure function with no side effects. It returns `null` for unsupported message types (logged as a warning) and never throws.
+
+Messages from chats that have not been activated with `@bot start` are dropped before any I/O — nothing is written to disk, downloaded to `media/`, or shown in the UI.
 
 ---
 
@@ -250,6 +253,7 @@ GET /api/status
 POST /api/pair          { "phone": "905551234567" }
 POST /api/connect       — trigger reconnect
 POST /api/reset-auth    — clear session (data preserved)
+POST /api/wipe-data     — delete messages/vectors/media (session + settings preserved)
 POST /api/disconnect    — logout + wipe ALL data
 ```
 
