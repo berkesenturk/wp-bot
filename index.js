@@ -18,6 +18,8 @@ import { insertMessage, getRecentChats }  from "./src/db/messages.js";
 import { bufferAndMerge }                 from "./src/merger/index.js";
 import { normalize }                      from "./src/normalizer/index.js";
 import { dispatch }                       from "./src/router/index.js";
+import { parseLifecycleCommand,
+         handleLifecycle }               from "./src/router/lifecycle.js";
 import { MESSAGE_TYPES }                  from "./src/normalizer/types.js";
 import { useSQLiteAuthState }             from "./src/auth/sqliteAuthState.js";
 import { init as initEmbedder }                       from "./src/workers/embedder.js";
@@ -297,13 +299,31 @@ async function connectToWhatsApp() {
       }
       console.log("[pipeline] Normalized OK | id:", normalized.id, "| type:", normalized.type);
 
-      // 2. Download media immediately if image
+      // 2. Active gate — drop everything for inactive chats before any I/O.
+      //    Lifecycle commands (@bot start/stop/status) are the only exception:
+      //    they are handled and replied to, but the message is still not saved.
+      if (!isActive(normalized.chatId)) {
+        const lifecycle = parseLifecycleCommand(normalized.text);
+        if (lifecycle) {
+          const replyText = handleLifecycle(lifecycle.command, normalized.chatId, normalized.sender);
+          if (replyText) {
+            sock.sendMessage(rawMsg.key.remoteJid, { text: replyText }).catch(err =>
+              console.error("[lifecycle] Reply failed:", err.message)
+            );
+          }
+        } else {
+          console.log("[pipeline] Inactive chat — skipping:", normalized.chatId);
+        }
+        continue;
+      }
+
+      // 3. Download media immediately if image
       if (normalized.type === MESSAGE_TYPES.IMAGE) {
         const localPath = await downloadMedia(rawMsg, normalized.id, normalized.media.mimeType);
         if (localPath) normalized.media.localPath = localPath;
       }
 
-      // 3. Emit to UI immediately so the user sees the message without delay
+      // 4. Emit to UI immediately so the user sees the message without delay
       const jid  = rawMsg.key.remoteJid;
       const chat = getOrCreateChat(jid, normalized.chatId, normalized.chatType);
       const uiMsg = {
@@ -322,7 +342,7 @@ async function connectToWhatsApp() {
       io.emit("message",      uiMsg);
       io.emit("chat_updated", chatSummary(chat));
 
-      // 4. Buffer for merging — DB insert and dispatch happen after the merge
+      // 5. Buffer for merging — DB insert and dispatch happen after the merge
       //    window closes so consecutive messages are handled as one thought.
       bufferAndMerge(normalized, jid, (merged, replyJid) => {
         try {
